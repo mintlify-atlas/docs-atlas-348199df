@@ -1,7 +1,7 @@
 ---
-title: "Exchange, International & Prime WebSocket Feeds"
+title: "Exchange, International and Prime WebSocket API Feeds"
 sidebarTitle: "Exchange & Institutional"
-description: "Use WebsocketClient to connect to Coinbase Exchange, International, and Prime WebSocket feeds — each requires distinct WsKey values and authentication handling."
+description: "Stream Coinbase Exchange, International, and Prime data via WebsocketClient — each feed uses a distinct WsKey and handles authentication automatically."
 ---
 
 Coinbase's institutional-grade APIs — Exchange, International (INTX), and Prime — each expose their own WebSocket feed. All three use the same `WebsocketClient` and the same event model as Advanced Trade. The main difference is the WsKey you pass to `subscribe()`, and the credentials your client is initialised with.

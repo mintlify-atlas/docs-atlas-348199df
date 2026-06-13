@@ -41,7 +41,7 @@ The constructor accepts an options object and an optional custom logger. All fie
 | `reconnectTimeout` | `number` | Delay (ms) before spawning a reconnection attempt. Defaults to `500`. |
 | `useSandbox` | `boolean` | Connect to sandbox URLs where available (Exchange and International only). |
 | `wsUrl` | `string` | Override the WebSocket URL for all connections. |
-| `wsOptions` | `object` | Additional options passed directly to the `ws` library (e.g. custom agent, protocols). |
+| `wsOptions` | `object` | Additional options passed directly to the underlying `ws` library (e.g. custom agent, protocols). |
 | `customSignMessageFn` | `function` | Provide your own HMAC-SHA256 signing implementation (e.g. Node.js `createHmac` for better performance). |
 | `reauthWSAPIOnReconnect` | `boolean` | Re-authenticate the WS API channel automatically on reconnect. Defaults to `false`. |
 
@@ -292,7 +292,7 @@ wsClient.subscribe('user', WS_KEY_MAP.advTradeUserData);
 
 // Subscribe to Exchange public order book
 wsClient.subscribe(
-  [{ topic: 'level2', channels: [{ name: 'level2', product_ids: ['BTC-USD'] }] }],
+  { topic: 'level2', payload: { product_ids: ['BTC-USD'] } },
   WS_KEY_MAP.exchangeMarketData
 );
 ```

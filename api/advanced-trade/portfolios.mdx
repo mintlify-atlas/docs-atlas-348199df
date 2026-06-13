@@ -18,7 +18,7 @@ List all portfolios belonging to the current user. Optionally filter by portfoli
 | **HTTP** | `GET /api/v3/brokerage/portfolios` |
 
 <ParamField query="portfolio_type" type="string">
-  Filter by type: `"DEFAULT"`, `"CONSUMER"`, `"INTX"`, or `"UNDEFINED"`.
+  Filter by type: `"UNDEFINED"`, `"DEFAULT"`, `"CONSUMER"`, or `"INTX"`.
 </ParamField>
 
 **Returns:** `Promise<{ portfolios: AdvTradePortfolio[] }>` — each portfolio has `uuid`, `name`, `type`, and `deleted` flag.
@@ -181,7 +181,7 @@ console.log('Renamed to:', portfolio.name);
 
 ## Perpetuals Endpoints
 
-The following endpoints interact with the Coinbase International Exchange (Intx) perpetuals platform associated with a portfolio.
+The following endpoints interact with the Coinbase International Exchange (Intx) perpetuals platform associated with a portfolio. All Intx endpoints use the `/api/v3/brokerage/intx/` path prefix.
 
 ---
 

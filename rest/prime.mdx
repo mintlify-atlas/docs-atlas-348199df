@@ -212,6 +212,7 @@ Custody wallets hold assets within your Prime portfolios. You can create wallets
 | `createWallet(params)` | Create a new wallet |
 | `getWalletById(params)` | Get a specific wallet |
 | `getWalletBalance(params)` | Get the balance of a wallet |
+| `getWeb3WalletBalances(params)` | Get balances for a web3 wallet |
 | `getWalletDepositInstructions(params)` | Get deposit address/instructions |
 | `getWalletTransactions(params)` | List transactions for a wallet |
 | `createTransfer(params)` | Transfer funds between wallets |
@@ -278,8 +279,14 @@ Prime offers financing features including interest accruals, locates for short s
 |---|---|
 | `getEntityAccruals(params)` | List interest accruals for an entity |
 | `getEntityLocateAvailabilities(params)` | Get available short locates |
+| `getEntityMargin(params)` | Real-time margin evaluation for an entity |
+| `getEntityMarginSummaries(params)` | Historical margin call summaries for an entity |
+| `getEntityTFTieredFees(params)` | Get trade finance tiered pricing fees for an entity |
 | `getPortfolioAccruals(params)` | List interest accruals for a portfolio |
+| `getPortfolioBuyingPower(params)` | Buying power based on holdings and available credit |
 | `getPortfolioLocates(params)` | List existing locates |
+| `getPortfolioMarginConversions(params)` | List margin conversions (deprecated — use entity margin summaries) |
+| `getPortfolioWithdrawalPower(params)` | Max withdrawable quantity for an asset |
 | `getInvoices(params)` | List invoices for an entity |
 
 ```typescript
@@ -312,6 +319,57 @@ await client.createAddressBookEntry({
   address: '0xYourAddress',
   currency_symbol: 'ETH',
   name: 'Hot Wallet',
+});
+```
+
+---
+
+## Assets
+
+```typescript
+// List all assets available for a given entity
+const assets = await client.getAssets({
+  entity_id: 'your-entity-id',
+});
+```
+
+---
+
+## Payment Methods
+
+Retrieve payment methods registered for an entity.
+
+| Method | Description |
+|---|---|
+| `getEntityPaymentMethods(params)` | List all payment methods for an entity |
+| `getEntityPaymentMethod(params)` | Get a specific payment method by ID |
+
+```typescript
+const methods = await client.getEntityPaymentMethods({
+  entity_id: 'your-entity-id',
+});
+
+const method = await client.getEntityPaymentMethod({
+  entity_id: 'your-entity-id',
+  payment_method_id: 'pm-uuid',
+});
+```
+
+---
+
+## Positions
+
+Query aggregate and individual position data at the entity level.
+
+| Method | Description |
+|---|---|
+| `getEntityAggregatePositions(params)` | List paginated aggregate positions for an entity |
+| `getEntityPositions(params)` | List paginated positions for an entity |
+
+```typescript
+const positions = await client.getEntityPositions({
+  entity_id: 'your-entity-id',
+  limit: 100,
 });
 ```
 

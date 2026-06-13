@@ -260,11 +260,14 @@ await client.movePortfolioFunds({
 
 ## Futures
 
-Interact with Coinbase Financial Markets (CFM) futures accounts — balances, positions, and fund sweeps.
+Interact with Coinbase Financial Markets (CFM) futures accounts — balances, intraday margin settings, positions, and fund sweeps.
 
 | Method | Description |
 |---|---|
 | `getFuturesBalanceSummary()` | Get CFM balance summary |
+| `getIntradayMarginSetting()` | Get the futures intraday margin setting |
+| `setIntradayMarginSetting(params?)` | Set the futures intraday margin setting |
+| `getCurrentMarginWindow(params?)` | Get the current margin window |
 | `getFuturesPositions()` | List all open CFM positions |
 | `getFuturesPosition(params)` | Get a single CFM position |
 | `scheduleFuturesSweep(params?)` | Schedule a sweep from FCM wallet to USD spot |
@@ -295,6 +298,8 @@ Manage perpetual swap positions on the Intx (International) portfolio.
 | `getPerpetualsPortfolioSummary(params)` | Get portfolio-level perpetuals summary |
 | `getPerpetualsPositions(params)` | List all open perpetuals positions |
 | `getPerpetualsPosition(params)` | Get a single perpetuals position |
+| `getPortfoliosBalances(params)` | List asset balances on Intx for a given portfolio |
+| `updateMultiAssetCollateral(params?)` | Enable or disable multi-asset collateral for a portfolio |
 
 ```typescript
 const summary = await client.getPerpetualsPortfolioSummary({
@@ -305,6 +310,19 @@ const positions = await client.getPerpetualsPositions({
   portfolio_uuid: 'your-intx-portfolio-uuid',
 });
 ```
+
+---
+
+## Transaction Summary (Fees)
+
+```typescript
+// Get fee tier, total volume, and fee summary for your account
+const summary = await client.getTransactionSummary();
+```
+
+| Method | Description |
+|---|---|
+| `getTransactionSummary(params?)` | Get fee tiers, total volume, and fees |
 
 ---
 

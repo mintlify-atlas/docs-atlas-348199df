@@ -218,6 +218,7 @@ Product endpoints are **public** — no authentication required.
 | Method | Description |
 |---|---|
 | `getAllTradingPairs(params?)` | List all currency pairs |
+| `getAllProductVolume()` | Get 30-day and 24-hour volume for all products |
 | `getProduct(params)` | Get a single product |
 | `getProductBook(params)` | Get the order book (level 1, 2, or 3) |
 | `getProductCandles(params)` | Get OHLCV candlestick data |
@@ -285,7 +286,9 @@ Move funds in and out of your Exchange trading accounts via Coinbase wallets or 
 | `withdrawToPaymentMethod(params)` | Withdraw to a linked payment method |
 | `getTransfers(params?)` | List all transfers |
 | `getTransfer(params)` | Get a single transfer |
+| `submitTravelInformation(params)` | Submit travel rule information for a transfer |
 | `getCryptoWithdrawalFeeEstimate(params)` | Estimate fees for a crypto withdrawal |
+| `getPaymentMethods()` | List all linked payment methods |
 
 ```typescript
 // Deposit from a linked Coinbase wallet
@@ -312,6 +315,154 @@ await client.withdrawToCryptoAddress({
 ```typescript
 // Get your current maker/taker fee rates and 30-day trailing volume
 const fees = await client.getFees();
+```
+
+---
+
+## Loans
+
+Manage institutional lending — open loans, track interest, and manage repayments.
+
+| Method | Description |
+|---|---|
+| `getLoans(params?)` | List loans (optionally filtered by IDs) |
+| `getLoanAssets()` | List lendable assets and collateral haircut weights |
+| `getInterestSummaries()` | List interest owed summaries by asset |
+| `getInterestRateHistory(params)` | List interest rate history for a loan |
+| `getInterestCharges(params)` | List interest charges for a loan |
+| `getLendingOverview()` | Get overall lending overview (balance, collateral, available to borrow) |
+| `getNewLoanPreview(params)` | Preview the result of opening a new loan |
+| `submitNewLoan(params)` | Open a new loan |
+| `getNewLoanOptions()` | List available currencies and rates for new loans |
+| `repayLoanInterest(params)` | Submit an interest repayment |
+| `repayLoanPrincipal(params)` | Submit a principal repayment |
+| `getPrincipalRepaymentPreview(params)` | Preview the results of a principal repayment |
+
+```typescript
+// Get lending overview
+const overview = await client.getLendingOverview();
+
+// Preview opening a new loan of 1 BTC
+const preview = await client.getNewLoanPreview({
+  currency: 'BTC',
+  native_amount: '1',
+});
+
+// Open the loan
+await client.submitNewLoan({ currency: 'BTC', native_amount: '1' });
+
+// Repay interest
+await client.repayLoanInterest({ loan_id: 'loan-uuid', amount: '0.01', currency: 'BTC' });
+```
+
+---
+
+## Oracle (Signed Prices)
+
+```typescript
+// Get cryptographically signed prices for Compound's Open Oracle smart contract
+const prices = await client.getSignedPrices();
+```
+
+---
+
+## Reports
+
+Generate and retrieve user-created reports (fills, account, and balance snapshots).
+
+| Method | Description |
+|---|---|
+| `getAllReports(params?)` | List all user-generated reports |
+| `createReport(params)` | Generate a new report |
+| `getReport(params)` | Get a specific report by ID |
+
+```typescript
+const reports = await client.getAllReports();
+
+const report = await client.createReport({
+  type: 'fills',
+  fills: { product_id: 'BTC-USD', start_date: '2024-01-01', end_date: '2024-01-31' },
+  format: 'csv',
+  email: 'you@example.com',
+});
+```
+
+---
+
+## Travel Rules
+
+```typescript
+// Retrieve all stored travel rule information
+const rules = await client.getTravelRuleInformation();
+
+// Create a travel rule entry
+await client.createTravelRuleEntry({
+  address: '0xYourAddress',
+  originator_name: 'Jane Doe',
+  originator_country: 'US',
+});
+
+// Delete an existing entry
+await client.deleteTravelRuleEntry({ id: 'travel-rule-id' });
+```
+
+| Method | Description |
+|---|---|
+| `getTravelRuleInformation(params?)` | List all stored travel rule information |
+| `createTravelRuleEntry(params)` | Create a travel rule entry for a sending address |
+| `deleteTravelRuleEntry(params)` | Delete an existing travel rule entry |
+
+---
+
+## Users
+
+```typescript
+// Get exchange limits for a user
+const limits = await client.getUserExchangeLimits({ user_id: 'user-id' });
+
+// Update settlement preference (hold funds in USD or USDC)
+await client.updateSettlementPreference({
+  user_id: 'user-id',
+  settlement_preference: 'USD',
+});
+
+// Get aggregated trading volumes for a user
+const volume = await client.getUserTradingVolume({ user_id: 'user-id' });
+```
+
+| Method | Description |
+|---|---|
+| `getUserExchangeLimits(params)` | Get exchange limits for a user |
+| `updateSettlementPreference(params)` | Update USD or USDC settlement preference |
+| `getUserTradingVolume(params)` | Get aggregated trading volumes for a user |
+
+---
+
+## Wrapped Assets
+
+Manage cbETH and other wrapped/staked assets.
+
+| Method | Description |
+|---|---|
+| `getAllWrappedAssets()` | List all supported wrapped assets |
+| `getAllStakeWraps(params?)` | List stake-wraps in the current profile |
+| `createStakeWrap(params)` | Stake and wrap from one currency to another |
+| `getStakeWrap(params)` | Get details for a specific stake-wrap |
+| `getWrappedAssetDetails(params)` | Get circulating supply and conversion rate for a wrapped asset |
+| `getWrappedAssetConversionRate(params)` | Get the conversion rate for a wrapped asset |
+
+```typescript
+const wrapped = await client.getAllWrappedAssets();
+
+const details = await client.getWrappedAssetDetails({
+  wrapped_asset_id: 'CBETH',
+});
+
+await client.createStakeWrap({
+  from_currency: 'ETH',
+  to_currency: 'CBETH',
+  amount: '1',
+});
 ```
 
 ---

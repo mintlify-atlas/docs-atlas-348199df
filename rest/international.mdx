@@ -150,6 +150,15 @@ Instruments are the tradeable products on the International Exchange (e.g. perpe
 
 ---
 
+## Position Offsets
+
+```typescript
+// List all active position offsets (public endpoint)
+const offsets = await client.getPositionOffsets();
+```
+
+---
+
 ## Orders & Positions
 
 All order and fill endpoints require authentication.
@@ -233,14 +242,25 @@ The International Exchange is portfolio-margin based. All positions, balances, a
 |---|---|
 | `getUserPortfolios()` | List all portfolios |
 | `createPortfolio(params)` | Create a new portfolio (max 20) |
+| `updatePortfolioParameters(params)` | Update parameters for an existing portfolio (PATCH) |
 | `getUserPortfolio(params)` | Get a specific portfolio |
+| `updatePortfolio(params)` | Update an existing portfolio (PUT) |
 | `getPortfolioDetails(params)` | Get summary, positions, and balances |
 | `getPortfolioSummary(params)` | High-level portfolio overview |
 | `getPortfolioBalances(params)` | List all balances in a portfolio |
+| `getBalanceForPortfolioAsset(params)` | Get balance for a specific portfolio and asset |
 | `getPortfolioPositions(params)` | List all open positions |
-| `updatePortfolioParameters(params)` | Update portfolio parameters |
+| `getPositionForPortfolioInstrument(params)` | Get position for a specific portfolio and instrument |
+| `getTotalOpenPositionLimit(params)` | Get total open position limit across instruments |
+| `getOpenPositionLimitsForAllInstruments(params)` | List open position limits for all instruments |
+| `getOpenPositionLimitsForInstrument(params)` | Get open position limits for a specific instrument |
+| `setCrossCollateral(params)` | Enable or disable cross-collateral for a portfolio |
+| `setAutoMargin(params)` | Enable or disable auto-margin for a portfolio |
+| `setPortfolioMarginOverride(params)` | Set a margin override value for a portfolio |
+| `getFundTransferLimit(params)` | Get maximum transferable amount between portfolios |
 | `transferFundsBetweenPortfolios(params)` | Transfer assets between portfolios |
-| `transferPositionsBetweenPortfolios(params)` | Transfer an existing position |
+| `transferPositionsBetweenPortfolios(params)` | Transfer an existing position between portfolios |
+| `getPortfolioFeeRates()` | Get Perpetual Future and Spot fee rate tiers |
 
 ```typescript
 const portfolios = await client.getUserPortfolios();
@@ -255,6 +275,12 @@ await client.transferFundsBetweenPortfolios({
   to: 'target-portfolio-id',
   asset: 'BTC',
   amount: '1',
+});
+
+// Enable cross-collateral
+await client.setCrossCollateral({
+  portfolio: 'your-portfolio-id',
+  enabled: true,
 });
 ```
 
@@ -271,6 +297,8 @@ Deposit to and withdraw from your International Exchange portfolios.
 | `withdrawToCryptoAddress(params)` | Withdraw to an external crypto address |
 | `createCryptoAddress(params)` | Generate a deposit address |
 | `createCounterpartyId(params)` | Create a Coinbase network counterparty ID |
+| `validateCounterpartyId(params)` | Validate a counterparty ID |
+| `getCounterpartyWithdrawalLimit(params)` | Get maximum withdrawable amount to a counterparty |
 | `withdrawToCounterpartyId(params)` | Withdraw within the Coinbase network |
 
 ```typescript
@@ -287,6 +315,50 @@ await client.withdrawToCryptoAddress({
   asset: 'USDC',
   amount: '500',
   address: '0xYourEthAddress',
+});
+```
+
+---
+
+## Portfolio Loans
+
+Manage borrow/repay operations on portfolio assets.
+
+| Method | Description |
+|---|---|
+| `getActiveLoansForPortfolio(params)` | List all active loans for a portfolio |
+| `getLoanInfoForPortfolioAsset(params)` | Get loan details for a specific portfolio and asset |
+| `acquireOrRepayLoan(params)` | Acquire or repay a loan for a portfolio and asset |
+| `previewLoanUpdate(params)` | Preview the result of a loan acquire or repayment |
+| `getMaxLoanAvailability(params)` | Get maximum acquirable loan amount for a portfolio and asset |
+
+```typescript
+const loans = await client.getActiveLoansForPortfolio({
+  portfolio: 'your-portfolio-id',
+});
+
+const availability = await client.getMaxLoanAvailability({
+  portfolio: 'your-portfolio-id',
+  asset: 'BTC',
+});
+
+// Preview acquiring a loan
+await client.previewLoanUpdate({
+  portfolio: 'your-portfolio-id',
+  asset: 'BTC',
+  action: 'ACQUIRE',
+  amount: '0.5',
+});
+```
+
+---
+
+## Rankings
+
+```typescript
+// Get your volume rankings for maker, taker, and total volume
+const rankings = await client.getRankings({
+  instrument_type: 'PERPETUAL_FUTURE',
 });
 ```
 

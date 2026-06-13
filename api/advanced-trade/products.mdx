@@ -30,7 +30,7 @@ Retrieve all available currency pairs for trading. Supports filtering by product
 </ParamField>
 
 <ParamField query="expiring_contract_status" type="string">
-  Filter expiring contracts: `"STATUS_UNEXPIRED"`, `"STATUS_EXPIRED"`, or `"STATUS_ALL"`.
+  Filter expiring contracts: `"STATUS_UNEXPIRED"`, `"STATUS_EXPIRED"`, `"STATUS_ALL"`, or `"UNKNOWN_EXPIRING_CONTRACT_STATUS"`.
 </ParamField>
 
 <ParamField query="get_tradability_status" type="boolean">
@@ -122,7 +122,7 @@ Retrieve OHLCV (candlestick) data for a product, grouped into time buckets of th
 </ParamField>
 
 <ParamField query="granularity" type="string" required>
-  Candle interval. One of: `"ONE_MINUTE"`, `"FIVE_MINUTE"`, `"FIFTEEN_MINUTE"`, `"THIRTY_MINUTE"`, `"ONE_HOUR"`, `"TWO_HOUR"`, `"SIX_HOUR"`, `"ONE_DAY"`.
+  Candle interval. One of: `"UNKNOWN_GRANULARITY"`, `"ONE_MINUTE"`, `"FIVE_MINUTE"`, `"FIFTEEN_MINUTE"`, `"THIRTY_MINUTE"`, `"ONE_HOUR"`, `"TWO_HOUR"`, `"SIX_HOUR"`, `"ONE_DAY"`.
 </ParamField>
 
 <ParamField query="limit" type="number">
@@ -261,15 +261,15 @@ Retrieve your personal transaction summary, including fee tiers, total volume, a
 | **HTTP** | `GET /api/v3/brokerage/transaction_summary` |
 
 <ParamField query="product_type" type="string">
-  Filter summary for `"SPOT"` or `"FUTURE"` products.
+  Filter summary by product type: `"UNKNOWN_PRODUCT_TYPE"`, `"SPOT"`, or `"FUTURE"`.
 </ParamField>
 
 <ParamField query="contract_expiry_type" type="string">
-  Filter by contract expiry type for futures: `"SPOT"` or `"FUTURE"`.
+  Filter by contract expiry type: `"UNKNOWN_CONTRACT_EXPIRY_TYPE"`, `"SPOT"`, or `"FUTURE"`.
 </ParamField>
 
 <ParamField query="product_venue" type="string">
-  Filter by trading venue: `"CBE"`, `"FCM"`, `"INTX"`, or `"UNKNOWN_VENUE_TYPE"`.
+  Filter by trading venue: `"UNKNOWN_VENUE_TYPE"`, `"CBE"`, `"FCM"`, or `"INTX"`.
 </ParamField>
 
 **Returns:** `Promise<AdvTradeTransactionSummary>` — contains `total_volume`, `total_fees`, `fee_tier` (with `maker_fee_rate`, `taker_fee_rate`, tier bounds), `advanced_trade_only_volume`, `advanced_trade_only_fees`, and tax-related fields.
@@ -299,7 +299,33 @@ List all publicly available trading products.
 | **Auth** | None |
 | **HTTP** | `GET /api/v3/brokerage/market/products` |
 
-Accepts the same filter parameters as `getProducts()` (excluding `get_tradability_status`).
+<ParamField query="product_type" type="string">
+  Filter by product type: `"UNKNOWN_PRODUCT_TYPE"`, `"SPOT"`, or `"FUTURE"`.
+</ParamField>
+
+<ParamField query="product_ids" type="string[]">
+  Filter to a specific list of product IDs.
+</ParamField>
+
+<ParamField query="contract_expiry_type" type="string">
+  Filter futures by expiry type: `"UNKNOWN_CONTRACT_EXPIRY_TYPE"`, `"SPOT"`, or `"FUTURE"`.
+</ParamField>
+
+<ParamField query="expiring_contract_status" type="string">
+  Filter expiring contracts: `"UNKNOWN_EXPIRING_CONTRACT_STATUS"`, `"STATUS_UNEXPIRED"`, `"STATUS_EXPIRED"`, or `"STATUS_ALL"`.
+</ParamField>
+
+<ParamField query="get_all_products" type="boolean">
+  When `true`, return all products regardless of trading status.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Maximum number of products to return.
+</ParamField>
+
+<ParamField query="offset" type="number">
+  Number of products to skip (for pagination).
+</ParamField>
 
 **Returns:** `Promise<{ products: AdvTradePublicProduct[]; num_products: number }>`.
 
@@ -379,7 +405,25 @@ Fetch historical OHLCV candle data without authentication.
 | **Auth** | None |
 | **HTTP** | `GET /api/v3/brokerage/market/products/{product_id}/candles` |
 
-Accepts the same parameters as `getProductCandles()` (`product_id`, `start`, `end`, `granularity`, `limit`).
+<ParamField path="product_id" type="string" required>
+  The trading pair, e.g. `"BTC-USD"`.
+</ParamField>
+
+<ParamField query="start" type="string" required>
+  Start of the time range as a Unix timestamp string (seconds).
+</ParamField>
+
+<ParamField query="end" type="string" required>
+  End of the time range as a Unix timestamp string (seconds).
+</ParamField>
+
+<ParamField query="granularity" type="string" required>
+  Candle interval. One of: `"UNKNOWN_GRANULARITY"`, `"ONE_MINUTE"`, `"FIVE_MINUTE"`, `"FIFTEEN_MINUTE"`, `"THIRTY_MINUTE"`, `"ONE_HOUR"`, `"TWO_HOUR"`, `"SIX_HOUR"`, `"ONE_DAY"`.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Maximum number of candles to return.
+</ParamField>
 
 **Returns:** `Promise<{ candles: AdvTradeCandle[] }>`.
 

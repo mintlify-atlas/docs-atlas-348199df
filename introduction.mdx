@@ -1,5 +1,5 @@
 ---
-title: "Coinbase API SDK: JavaScript & TypeScript SDK for Every Coinbase API"
+title: "coinbase-api SDK: REST & WebSocket for All Coinbase APIs"
 sidebarTitle: "Introduction"
 description: "coinbase-api is a complete Node.js SDK for Coinbase's Advanced Trade, App, Exchange, International, Prime, and Commerce REST APIs and WebSockets."
 ---
@@ -49,7 +49,7 @@ Each Coinbase product group has its own REST client. Import only what you need.
 
 ## WebSocket Client
 
-A single `WebsocketClient` class handles every Coinbase WebSocket feed — public market data and private user data alike. You pass a WsKey string to route subscriptions to the correct upstream connection, and the client manages keep-alive pings, reconnection, and resubscription automatically.
+A single `WebsocketClient` class handles every Coinbase WebSocket feed — public market data and private user data alike. You pass a `WsKey` string to route subscriptions to the correct upstream connection, and the client manages keep-alive pings, reconnection, and resubscription automatically.
 
 ```typescript
 import { WebsocketClient } from 'coinbase-api';
@@ -100,6 +100,61 @@ const order: SubmitAdvTradeOrderRequest = {
 };
 
 const result = await client.submitOrder(order);
+```
+
+## Exported Types & Utilities
+
+The package exports the following public symbols from `coinbase-api`. These cover every client class, configuration type, and WebSocket utility you need:
+
+| Export | Kind | Description |
+|---|---|---|
+| `CBAdvancedTradeClient` | Class | REST client for the Advanced Trade API |
+| `CBAppClient` | Class | REST client for the Coinbase App API |
+| `CBExchangeClient` | Class | REST client for the Exchange API |
+| `CBInternationalClient` | Class | REST client for the International Exchange API |
+| `CBPrimeClient` | Class | REST client for the Prime API |
+| `CBCommerceClient` | Class | REST client for the Commerce API |
+| `WebsocketClient` | Class | Unified WebSocket client for all feeds |
+| `WS_KEY_MAP` | Const | Enum-like map of all valid WebSocket key strings (e.g. `advTradeMarketData`, `advTradeUserData`, `exchangeMarketData`) |
+| `WsKey` | Type | Union of all valid WsKey string literals derived from `WS_KEY_MAP` |
+| `WsTopicRequest` | Interface | Structured subscribe/unsubscribe request object `{ topic: string; payload?: any }` |
+| `WSConnectedResult` | Interface | Result returned when a WebSocket connection is established: `{ wsKey: string }` |
+| `RestClientOptions` | Interface | Configuration object accepted by all REST client constructors (credentials, sandbox, keep-alive, etc.) |
+| `DefaultLogger` | Const | Default logger object with `trace`, `info`, and `error` methods; spread and override to customise logging |
+
+```typescript
+import {
+  CBAdvancedTradeClient,
+  WebsocketClient,
+  WS_KEY_MAP,
+  DefaultLogger,
+} from 'coinbase-api';
+import type {
+  WsKey,
+  WsTopicRequest,
+  WSConnectedResult,
+  RestClientOptions,
+} from 'coinbase-api';
+
+// Use WS_KEY_MAP like an enum to avoid typos in WsKey strings
+const myKey: WsKey = WS_KEY_MAP.advTradeMarketData; // 'advTradeMarketData'
+
+// Customise the logger — suppress noisy trace messages
+const logger = {
+  ...DefaultLogger,
+  trace: (...params: any[]) => {
+    // Suppress heartbeat noise
+    if (['Sending ping', 'Received pong, clearing pong timer'].includes(params[0])) return;
+    console.log('trace', params);
+  },
+};
+
+const options: RestClientOptions = {
+  apiKey: process.env.API_KEY_NAME!,
+  apiSecret: process.env.API_PRIVATE_KEY!,
+};
+
+const ws = new WebsocketClient(options, logger);
 ```
 
 ## Authentication

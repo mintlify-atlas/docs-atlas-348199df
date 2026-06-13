@@ -41,6 +41,10 @@ Create a new order. The `order_configuration` field determines the order type an
   Margin mode for leveraged orders. One of `"CROSS"` or `"ISOLATED"`.
 </ParamField>
 
+<ParamField body="attached_order_configuration" type="OrderConfiguration">
+  An optional secondary order configuration attached to this order (e.g. a take-profit or stop-loss leg).
+</ParamField>
+
 <ParamField body="preview_id" type="string">
   The `preview_id` returned by `previewOrder()` — links this order to a prior preview.
 </ParamField>
@@ -225,6 +229,10 @@ List historical orders filtered by optional query parameters. Open orders are li
   Filter by status strings, e.g. `["OPEN"]`, `["FILLED"]`, `["CANCELLED"]`.
 </ParamField>
 
+<ParamField query="time_in_forces" type="string[]">
+  Filter by time-in-force values, e.g. `["GOOD_UNTIL_CANCELLED"]`.
+</ParamField>
+
 <ParamField query="order_types" type="string[]">
   Filter by order type strings, e.g. `["LIMIT"]`, `["MARKET"]`.
 </ParamField>
@@ -241,6 +249,18 @@ List historical orders filtered by optional query parameters. Open orders are li
   RFC3339 timestamp. End of the date range.
 </ParamField>
 
+<ParamField query="order_placement_source" type="string">
+  Filter by order placement source: `"UNKNOWN_PLACEMENT_SOURCE"`, `"RETAIL_SIMPLE"`, or `"RETAIL_ADVANCED"`.
+</ParamField>
+
+<ParamField query="contract_expiry_type" type="string">
+  Filter futures by contract expiry: `"UNKNOWN_CONTRACT_EXPIRY_TYPE"`, `"PERPETUAL"`, or `"EXPIRING"`.
+</ParamField>
+
+<ParamField query="asset_filters" type="string[]">
+  Filter orders by asset identifiers.
+</ParamField>
+
 <ParamField query="limit" type="number">
   Maximum number of orders to return per page.
 </ParamField>
@@ -250,7 +270,7 @@ List historical orders filtered by optional query parameters. Open orders are li
 </ParamField>
 
 <ParamField query="sort_by" type="string">
-  Sort results by `"LIMIT_PRICE"` or `"LAST_FILL_TIME"`.
+  Sort results by `"UNKNOWN_SORT_BY"`, `"LIMIT_PRICE"`, or `"LAST_FILL_TIME"`.
 </ParamField>
 
 **Returns:** `Promise<{ orders: AdvTradeOrder[]; has_next: boolean; cursor?: string; sequence?: number }>`.
@@ -297,6 +317,10 @@ Retrieve a list of fills (trade executions) filtered by order, product, or time 
   RFC3339 timestamp. Return fills at or before this sequence time.
 </ParamField>
 
+<ParamField query="retail_portfolio_id" type="string">
+  Filter fills by retail portfolio ID.
+</ParamField>
+
 <ParamField query="limit" type="number">
   Maximum number of fills to return per page.
 </ParamField>
@@ -306,7 +330,7 @@ Retrieve a list of fills (trade executions) filtered by order, product, or time 
 </ParamField>
 
 <ParamField query="sort_by" type="string">
-  Sort fills by `"PRICE"` or `"TRADE_TIME"`.
+  Sort fills by `"UNKNOWN_SORT_BY"`, `"PRICE"`, or `"TRADE_TIME"`.
 </ParamField>
 
 **Returns:** `Promise<{ fills: AdvTradeFill[]; cursor?: string }>` — each `AdvTradeFill` contains `entry_id`, `trade_id`, `order_id`, `price`, `size`, `commission`, `side`, and RFC3339 `trade_time`.
@@ -391,6 +415,10 @@ Simulate submitting an order to see the estimated total, commission, leverage pa
   `"ISOLATED"` or `"CROSS"`.
 </ParamField>
 
+<ParamField body="retail_portfolio_id" type="string">
+  Optional retail portfolio ID to associate with the preview.
+</ParamField>
+
 **Returns:** `Promise<AdvTradeOrderPreview>` — includes `order_total`, `commission_total`, `base_size`, `quote_size`, `best_bid`, `best_ask`, `slippage`, `leverage`, `preview_id`, and buffer fields for leveraged positions.
 
 ```typescript
@@ -425,12 +453,12 @@ Place an order that closes any open position for the specified futures or perpet
   The futures or perpetuals product ID whose open position should be closed.
 </ParamField>
 
-<ParamField body="size" type="string">
-  Quantity to close. Omit to close the entire open position.
-</ParamField>
-
 <ParamField body="client_order_id" type="string">
   Optional client-supplied identifier. Auto-generated if omitted.
+</ParamField>
+
+<ParamField body="size" type="string">
+  Quantity to close. Omit to close the entire open position.
 </ParamField>
 
 **Returns:** `Promise<AdvTradeClosePositionResponse>` — contains `success`, an optional `success_response` with order details, and an optional `error_response`.
