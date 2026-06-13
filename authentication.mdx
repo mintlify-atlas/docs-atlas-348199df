@@ -1,0 +1,264 @@
+---
+title: "Authenticate Requests with the Coinbase API SDK"
+sidebarTitle: "Authentication"
+description: "Learn how to obtain and configure API credentials for each Coinbase platform: JWT-based keys for Advanced Trade and App, and passphrase keys for Exchange, International, and Prime."
+---
+
+`coinbase-api` supports two distinct authentication schemes. Which scheme you need depends entirely on which Coinbase product you are connecting to. This page explains both methods, shows exact configuration examples for every client, and documents every field in `RestClientOptions`.
+
+<Warning>
+  **Never commit private keys or secrets to source control.** Store all credentials as environment variables (e.g. with a `.env` file and `dotenv`) or in a secrets manager. Rotate any key that you suspect may have been exposed.
+</Warning>
+
+## Method 1: JWT Authentication (ECDSA / ED25519)
+
+**Used by:** `CBAdvancedTradeClient`, `CBAppClient`, and `WebsocketClient` (when connecting to Advanced Trade or App feeds).
+
+Coinbase's Advanced Trade and App APIs use short-lived JSON Web Tokens (JWTs). You sign each request with a CDP API private key, and the SDK generates and attaches the JWT automatically. You never need to construct a JWT yourself.
+
+Coinbase issues two key formats — both are supported and detected automatically at runtime:
+
+| Format | `apiKey` value | `apiSecret` value |
+|---|---|---|
+| **ECDSA** | Full key name path (e.g. `organizations/.../apiKeys/...`) | PEM-formatted EC private key string including `-----BEGIN EC PRIVATE KEY-----` header/footer |
+| **ED25519** | Short key ID | Base64-encoded private key string |
+
+### Getting your CDP API key
+
+1. Go to [https://www.coinbase.com/settings/api](https://www.coinbase.com/settings/api).
+2. Click **New API Key** and select the scopes your application needs.
+3. Download the generated `cdp_api_key.json` file — it contains `name` and `privateKey` fields.
+
+### ECDSA key configuration
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  // The key `name` from your cdp_api_key.json
+  apiKey:
+    'organizations/13232211d-d7e2-d7e2-d7e2-d7e2d7e2d7e2/apiKeys/d7e2d7e2-d7e2-d7e2-d7e2-d7e2d7e2d7e2',
+  // The full PEM block, including header/footer and embedded newlines
+  apiSecret:
+    '-----BEGIN EC PRIVATE KEY-----\nADFGHmkgnjdfg16k165kuu1kdtyudtyjdtyjytj/ADFGHmkgnjdfg16k165kuu1k\n...\n-----END EC PRIVATE KEY-----\n',
+});
+```
+
+### ED25519 key configuration
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your-api-key-id',
+  apiSecret: 'yourExampleApiSecretEd25519Version==',
+});
+```
+
+### Using the downloaded `cdp_api_key.json` directly
+
+You can parse and pass the downloaded JSON file as the `cdpApiKey` option instead of splitting it into `apiKey` and `apiSecret`. The SDK extracts both fields internally.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+// Represents the object from your downloaded cdp_api_key.json
+const cdpApiKey = {
+  name: 'organizations/13232211d-d7e2-d7e2-d7e2-d7e2d7e2d7e2/apiKeys/d7e2d7e2-d7e2-d7e2-d7e2-d7e2d7e2d7e2',
+  privateKey:
+    '-----BEGIN EC PRIVATE KEY-----\nADFGHmkgnjdfg16k165kuu1k...\n-----END EC PRIVATE KEY-----\n',
+};
+
+const client = new CBAdvancedTradeClient({ cdpApiKey });
+```
+
+### CBAppClient — same credentials, different client
+
+```typescript
+import { CBAppClient } from 'coinbase-api';
+
+const client = new CBAppClient({
+  apiKey: process.env.API_KEY_NAME!,
+  apiSecret: process.env.API_PRIVATE_KEY!,
+});
+```
+
+---
+
+## Method 2: API Key + Secret + Passphrase
+
+**Used by:** `CBExchangeClient`, `CBInternationalClient`, `CBPrimeClient`.
+
+These platforms use HMAC-based request signing. Each request is signed with the API secret and must also include a passphrase that was chosen at key creation time. This passphrase is **not** your account password.
+
+### CBExchangeClient
+
+```typescript
+import { CBExchangeClient } from 'coinbase-api';
+
+const client = new CBExchangeClient({
+  apiKey: process.env.CB_EXCHANGE_API_KEY!,
+  apiSecret: process.env.CB_EXCHANGE_API_SECRET!,
+  apiPassphrase: process.env.CB_EXCHANGE_API_PASSPHRASE!,
+  // Optionally connect to the Exchange sandbox environment:
+  // useSandbox: true,
+});
+
+const currency = await client.getCurrency('BTC');
+console.log(currency);
+```
+
+### CBInternationalClient
+
+```typescript
+import { CBInternationalClient } from 'coinbase-api';
+
+const client = new CBInternationalClient({
+  apiKey: process.env.CB_INTL_API_KEY!,
+  apiSecret: process.env.CB_INTL_API_SECRET!,
+  apiPassphrase: process.env.CB_INTL_API_PASSPHRASE!,
+  // Optionally connect to the International sandbox environment:
+  // useSandbox: true,
+});
+
+const assetDetails = await client.getAssetDetails({ asset: 'BTC' });
+console.log(assetDetails);
+```
+
+### CBPrimeClient
+
+```typescript
+import { CBPrimeClient } from 'coinbase-api';
+
+const client = new CBPrimeClient({
+  apiKey: process.env.CB_PRIME_API_KEY!,
+  apiSecret: process.env.CB_PRIME_API_SECRET!,
+  apiPassphrase: process.env.CB_PRIME_API_PASSPHRASE!,
+  // Note: Coinbase Prime has no sandbox environment.
+});
+```
+
+---
+
+## Sandbox Environments
+
+Coinbase provides sandbox environments for two of the six platforms:
+
+| Client | Sandbox available | `useSandbox: true` base URL |
+|---|---|---|
+| `CBExchangeClient` | ✅ Yes | `https://api-public.sandbox.exchange.coinbase.com` |
+| `CBInternationalClient` | ✅ Yes | `https://api-n5e1.coinbase.com` |
+| `CBAdvancedTradeClient` | ❌ No | — |
+| `CBAppClient` | ❌ No | — |
+| `CBPrimeClient` | ❌ No | — |
+| `CBCommerceClient` | ❌ No | — |
+
+Set `useSandbox: true` in your `RestClientOptions` to route requests to the sandbox:
+
+```typescript
+const client = new CBExchangeClient({
+  apiKey: process.env.CB_EXCHANGE_API_KEY!,
+  apiSecret: process.env.CB_EXCHANGE_API_SECRET!,
+  apiPassphrase: process.env.CB_EXCHANGE_API_PASSPHRASE!,
+  useSandbox: true,
+});
+```
+
+---
+
+## RestClientOptions Reference
+
+Every REST client constructor accepts a `RestClientOptions` object. All fields are optional unless your chosen API requires specific credentials.
+
+<ParamField body="apiKey" type="string">
+  Your API key identifier.
+
+  - **Advanced Trade / App APIs:** The full CDP key name, e.g. `organizations/{org_id}/apiKeys/{key_id}`.
+  - **Exchange / International / Prime APIs:** The API key string issued by Coinbase.
+</ParamField>
+
+<ParamField body="apiSecret" type="string">
+  Your API secret.
+
+  - **Advanced Trade / App APIs:** The private key string. For ECDSA keys this is the full PEM block including `-----BEGIN EC PRIVATE KEY-----` header and footer with embedded `\n` characters. For ED25519 keys this is the base64 string.
+  - **Exchange / International / Prime APIs:** The HMAC secret used to sign requests.
+</ParamField>
+
+<ParamField body="apiPassphrase" type="string">
+  Your API passphrase. Required only for `CBExchangeClient`, `CBInternationalClient`, and `CBPrimeClient`. This is the passphrase you chose when creating the key — not your Coinbase account password.
+</ParamField>
+
+<ParamField body="cdpApiKey" type="object">
+  An alternative to `apiKey` + `apiSecret` for JWT-based clients. Pass the parsed contents of your downloaded `cdp_api_key.json` file as `{ name: string; privateKey: string }`. The SDK maps `name` → `apiKey` and `privateKey` → `apiSecret` automatically.
+</ParamField>
+
+<ParamField body="useSandbox" type="boolean" default="false">
+  Route requests to the Coinbase sandbox environment. Only has an effect for `CBExchangeClient` and `CBInternationalClient`. For all other clients the sandbox URL is not available and this option is ignored.
+</ParamField>
+
+<ParamField body="jwtExpiresSeconds" type="number" default="120">
+  Lifetime in seconds of each generated JWT for Advanced Trade and App API requests. Increase this if you encounter token expiry errors on slow networks; decrease it if you want shorter credential windows.
+</ParamField>
+
+<ParamField body="baseUrl" type="string">
+  Override the base URL used for all REST requests, e.g. `https://api.differentUrl.com`. Useful for proxies, local mock servers, or testing against a custom endpoint.
+</ParamField>
+
+<ParamField body="strictParamValidation" type="boolean" default="false">
+  When `true`, the SDK throws an error if any request parameter is `undefined`. Useful during development to catch missing required fields early.
+</ParamField>
+
+<ParamField body="keepAlive" type="boolean" default="false">
+  Enable HTTP keep-alive on the underlying `axios` agent, reusing TCP connections across multiple requests for improved throughput in high-frequency scenarios.
+</ParamField>
+
+<ParamField body="keepAliveMsecs" type="number" default="1000">
+  When `keepAlive` is `true`, controls the interval (in milliseconds) between TCP keep-alive packets. Defaults to `1000` ms as provided by the Node.js `http.Agent`.
+</ParamField>
+
+<ParamField body="parseExceptions" type="boolean" default="true">
+  When `true`, the SDK post-processes HTTP error responses into structured JavaScript errors with status code and body information attached. Set to `false` to receive raw `axios` errors.
+</ParamField>
+
+<ParamField body="localisation" type="string">
+  Sets the `Accept-Language` header for localized error messages from the Coinbase App API. Supported values: `de`, `en`, `es`, `es-mx`, `fr`, `id`, `it`, `nl`, `pt`, `pt-br`. Note: only applies to `CBAppClient`.
+</ParamField>
+
+---
+
+## Environment Variables Pattern
+
+Always load credentials from the environment rather than embedding them in code:
+
+```typescript
+// .env file (add to .gitignore!)
+// API_KEY_NAME=organizations/your-org/apiKeys/your-key
+// API_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----\n..."
+
+import 'dotenv/config';
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: process.env.API_KEY_NAME!,
+  apiSecret: process.env.API_PRIVATE_KEY!,
+});
+```
+
+For passphrase-based clients:
+
+```typescript
+import 'dotenv/config';
+import { CBExchangeClient } from 'coinbase-api';
+
+const client = new CBExchangeClient({
+  apiKey: process.env.CB_EXCHANGE_API_KEY!,
+  apiSecret: process.env.CB_EXCHANGE_API_SECRET!,
+  apiPassphrase: process.env.CB_EXCHANGE_API_PASSPHRASE!,
+});
+```
+
+## Related
+
+- [Quickstart](/quickstart) — make your first API call.
+- [Introduction](/introduction) — overview of all six REST clients and features.
+- [Coinbase API Key Management](https://www.coinbase.com/settings/api) — create and manage your API keys.

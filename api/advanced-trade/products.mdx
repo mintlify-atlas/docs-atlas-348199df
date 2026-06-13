@@ -1,0 +1,431 @@
+---
+title: "Advanced Trade Products & Market Data API Reference"
+sidebarTitle: "Products"
+description: "Fetch product listings, OHLCV candles, order books, best bid/ask, and market trades from the Coinbase Advanced Trade API — both authenticated and public endpoints."
+---
+
+The Advanced Trade Products endpoints expose market data for all tradeable currency pairs on Coinbase. Authenticated endpoints allow you to filter by product type, contract expiry, and tradability status. Public equivalents (`getPublic*`) require no API key and are suitable for unauthenticated market-data consumers. The `getTransactionSummary()` endpoint — which returns your personal fee tier data — is also documented here as it depends on product-level parameters.
+
+---
+
+## getProducts
+
+Retrieve all available currency pairs for trading. Supports filtering by product type, contract expiry, and more.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/products` |
+
+<ParamField query="product_type" type="string">
+  Filter by product type: `"SPOT"`, `"FUTURE"`, or `"UNKNOWN_PRODUCT_TYPE"`.
+</ParamField>
+
+<ParamField query="product_ids" type="string[]">
+  Filter to a specific list of product IDs, e.g. `["BTC-USD", "ETH-USD"]`.
+</ParamField>
+
+<ParamField query="contract_expiry_type" type="string">
+  Filter futures by expiry type: `"PERPETUAL"`, `"EXPIRING"`, or `"UNKNOWN_CONTRACT_EXPIRY_TYPE"`.
+</ParamField>
+
+<ParamField query="expiring_contract_status" type="string">
+  Filter expiring contracts: `"STATUS_UNEXPIRED"`, `"STATUS_EXPIRED"`, or `"STATUS_ALL"`.
+</ParamField>
+
+<ParamField query="get_tradability_status" type="boolean">
+  When `true`, include tradability metadata in the response.
+</ParamField>
+
+<ParamField query="get_all_products" type="boolean">
+  When `true`, return all products regardless of trading status.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Maximum number of products to return.
+</ParamField>
+
+<ParamField query="offset" type="number">
+  Number of products to skip (for pagination).
+</ParamField>
+
+**Returns:** `Promise<{ products: AdvTradeProduct[]; num_products: number }>` — each `AdvTradeProduct` includes pricing, 24-hour volume, size increments, status flags, and optionally `future_product_details` for futures products.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your-api-key-name',
+  apiSecret: '-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n',
+});
+
+// Fetch all spot products
+const { products, num_products } = await client.getProducts({
+  product_type: 'SPOT',
+});
+console.log(`${num_products} spot products available`);
+```
+
+---
+
+## getProduct
+
+Retrieve detailed information about a single product by its ID.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/products/{product_id}` |
+
+<ParamField path="product_id" type="string" required>
+  The trading pair identifier, e.g. `"BTC-USD"`.
+</ParamField>
+
+<ParamField query="get_tradability_status" type="boolean">
+  When `true`, include tradability metadata in the response.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeProduct>` — the full product record including current price, 24h statistics, increment sizes, status flags, and `future_product_details` when applicable.
+
+```typescript
+const product = await client.getProduct({
+  product_id: 'BTC-USD',
+  get_tradability_status: true,
+});
+
+console.log(`BTC-USD price: ${product.price}`);
+console.log(`24h volume: ${product.volume_24h}`);
+console.log(`Trading disabled: ${product.trading_disabled}`);
+```
+
+---
+
+## getProductCandles
+
+Retrieve OHLCV (candlestick) data for a product, grouped into time buckets of the specified granularity. Returns at most 350 candles per request.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/products/{product_id}/candles` |
+
+<ParamField path="product_id" type="string" required>
+  The trading pair to fetch candles for, e.g. `"BTC-USD"`.
+</ParamField>
+
+<ParamField query="start" type="string" required>
+  Start of the time range as a Unix timestamp string (seconds), e.g. `"1704067200"`.
+</ParamField>
+
+<ParamField query="end" type="string" required>
+  End of the time range as a Unix timestamp string (seconds).
+</ParamField>
+
+<ParamField query="granularity" type="string" required>
+  Candle interval. One of: `"ONE_MINUTE"`, `"FIVE_MINUTE"`, `"FIFTEEN_MINUTE"`, `"THIRTY_MINUTE"`, `"ONE_HOUR"`, `"TWO_HOUR"`, `"SIX_HOUR"`, `"ONE_DAY"`.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Maximum number of candles to return. Defaults to 350.
+</ParamField>
+
+**Returns:** `Promise<{ candles: AdvTradeCandle[] }>` — each candle has `start` (Unix timestamp), `open`, `high`, `low`, `close`, and `volume`.
+
+```typescript
+const now = Math.floor(Date.now() / 1000);
+const oneDayAgo = now - 86400;
+
+const { candles } = await client.getProductCandles({
+  product_id: 'BTC-USD',
+  start: String(oneDayAgo),
+  end: String(now),
+  granularity: 'ONE_HOUR',
+});
+
+console.log(`Received ${candles.length} hourly candles`);
+console.log('Latest close:', candles[candles.length - 1]?.close);
+```
+
+---
+
+## getMarketTrades
+
+Fetch a snapshot of the most recent trades for a product along with the current best bid and ask.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/products/{product_id}/ticker` |
+
+<ParamField path="product_id" type="string" required>
+  The trading pair, e.g. `"ETH-USD"`.
+</ParamField>
+
+<ParamField query="limit" type="number" required>
+  Number of recent trades to return.
+</ParamField>
+
+<ParamField query="start" type="string">
+  RFC3339 timestamp. Return trades at or after this time.
+</ParamField>
+
+<ParamField query="end" type="string">
+  RFC3339 timestamp. Return trades at or before this time.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeMarketTrades>` — contains `trades` (array with `trade_id`, `price`, `size`, `side`, `time`), `best_bid`, and `best_ask`.
+
+```typescript
+const { trades, best_bid, best_ask } = await client.getMarketTrades({
+  product_id: 'ETH-USD',
+  limit: 25,
+});
+
+console.log(`Best bid: ${best_bid}, Best ask: ${best_ask}`);
+console.log('Latest trade:', trades[0]);
+```
+
+---
+
+## getBestBidAsk
+
+Get the best bid and ask prices across all products, or for a specified subset of products.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/best_bid_ask` |
+
+<ParamField query="product_ids" type="string[]">
+  Optional list of product IDs to restrict the response. Returns all products when omitted.
+</ParamField>
+
+**Returns:** `Promise<{ pricebooks: AdvTradePricebook[] }>` — each `AdvTradePricebook` contains `product_id`, `bids` array, `asks` array (each with `price` and `size`), and `time`.
+
+```typescript
+const { pricebooks } = await client.getBestBidAsk({
+  product_ids: ['BTC-USD', 'ETH-USD', 'SOL-USD'],
+});
+
+pricebooks.forEach(book => {
+  console.log(
+    `${book.product_id}: bid ${book.bids[0]?.price}, ask ${book.asks[0]?.price}`,
+  );
+});
+```
+
+---
+
+## getProductBook
+
+Retrieve the full order book (bids and asks) for a single product. Use the `limit` parameter to control depth and `aggregation_price_increment` to bucket price levels.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/product_book` |
+
+<ParamField query="product_id" type="string" required>
+  The trading pair, e.g. `"BTC-USD"`.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Number of bid/ask price levels to return.
+</ParamField>
+
+<ParamField query="aggregation_price_increment" type="string">
+  Aggregate price levels into buckets of this size, e.g. `"10.00"` for $10 buckets.
+</ParamField>
+
+**Returns:** `Promise<{ pricebook: AdvTradePricebook }>` — one pricebook with `product_id`, `bids`, `asks`, and `time`.
+
+```typescript
+const { pricebook } = await client.getProductBook({
+  product_id: 'BTC-USD',
+  limit: 10,
+});
+
+console.log('Top 10 bids:', pricebook.bids);
+console.log('Top 10 asks:', pricebook.asks);
+```
+
+---
+
+## getTransactionSummary
+
+Retrieve your personal transaction summary, including fee tiers, total volume, and fees paid over the rolling 30-day window.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/transaction_summary` |
+
+<ParamField query="product_type" type="string">
+  Filter summary for `"SPOT"` or `"FUTURE"` products.
+</ParamField>
+
+<ParamField query="contract_expiry_type" type="string">
+  Filter by contract expiry type for futures: `"SPOT"` or `"FUTURE"`.
+</ParamField>
+
+<ParamField query="product_venue" type="string">
+  Filter by trading venue: `"CBE"`, `"FCM"`, `"INTX"`, or `"UNKNOWN_VENUE_TYPE"`.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeTransactionSummary>` — contains `total_volume`, `total_fees`, `fee_tier` (with `maker_fee_rate`, `taker_fee_rate`, tier bounds), `advanced_trade_only_volume`, `advanced_trade_only_fees`, and tax-related fields.
+
+```typescript
+const summary = await client.getTransactionSummary({
+  product_type: 'SPOT',
+});
+
+console.log(`30-day volume: $${summary.total_volume}`);
+console.log(`Maker fee: ${summary.fee_tier.maker_fee_rate}`);
+console.log(`Taker fee: ${summary.fee_tier.taker_fee_rate}`);
+```
+
+---
+
+## Public Endpoints
+
+The following endpoints do not require authentication and are safe to call from unauthenticated clients or browser environments.
+
+### getPublicProducts
+
+List all publicly available trading products.
+
+| | |
+|---|---|
+| **Auth** | None |
+| **HTTP** | `GET /api/v3/brokerage/market/products` |
+
+Accepts the same filter parameters as `getProducts()` (excluding `get_tradability_status`).
+
+**Returns:** `Promise<{ products: AdvTradePublicProduct[]; num_products: number }>`.
+
+```typescript
+const publicClient = new CBAdvancedTradeClient();
+
+const { products } = await publicClient.getPublicProducts({
+  product_type: 'SPOT',
+  limit: 20,
+});
+console.log(`${products.length} spot products`);
+```
+
+---
+
+### getPublicProduct
+
+Retrieve public data for a single product.
+
+| | |
+|---|---|
+| **Auth** | None |
+| **HTTP** | `GET /api/v3/brokerage/market/products/{product_id}` |
+
+<ParamField path="product_id" type="string" required>
+  The trading pair, e.g. `"BTC-USD"`.
+</ParamField>
+
+**Returns:** `Promise<AdvTradePublicProduct>`.
+
+```typescript
+const product = await publicClient.getPublicProduct({ product_id: 'ETH-USD' });
+console.log(`ETH-USD price: ${product.price}`);
+```
+
+---
+
+### getPublicProductBook
+
+Fetch the public order book for a single product without authentication.
+
+| | |
+|---|---|
+| **Auth** | None |
+| **HTTP** | `GET /api/v3/brokerage/market/product_book` |
+
+<ParamField query="product_id" type="string" required>
+  The trading pair, e.g. `"BTC-USD"`.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Number of price levels to return.
+</ParamField>
+
+<ParamField query="aggregation_price_increment" type="string">
+  Bucket size for price level aggregation.
+</ParamField>
+
+**Returns:** `Promise<{ pricebook: AdvTradePricebook }>`.
+
+```typescript
+const { pricebook } = await publicClient.getPublicProductBook({
+  product_id: 'BTC-USD',
+  limit: 5,
+});
+console.log('Top ask:', pricebook.asks[0]);
+```
+
+---
+
+### getPublicProductCandles
+
+Fetch historical OHLCV candle data without authentication.
+
+| | |
+|---|---|
+| **Auth** | None |
+| **HTTP** | `GET /api/v3/brokerage/market/products/{product_id}/candles` |
+
+Accepts the same parameters as `getProductCandles()` (`product_id`, `start`, `end`, `granularity`, `limit`).
+
+**Returns:** `Promise<{ candles: AdvTradeCandle[] }>`.
+
+```typescript
+const { candles } = await publicClient.getPublicProductCandles({
+  product_id: 'BTC-USD',
+  start: String(Math.floor(Date.now() / 1000) - 3600),
+  end: String(Math.floor(Date.now() / 1000)),
+  granularity: 'ONE_MINUTE',
+});
+console.log(`${candles.length} one-minute candles`);
+```
+
+---
+
+### getPublicMarketTrades
+
+Retrieve the most recent public trades for a product without authentication.
+
+| | |
+|---|---|
+| **Auth** | None |
+| **HTTP** | `GET /api/v3/brokerage/market/products/{product_id}/ticker` |
+
+<ParamField path="product_id" type="string" required>
+  The trading pair, e.g. `"ETH-USD"`.
+</ParamField>
+
+<ParamField query="limit" type="number" required>
+  Number of trades to return.
+</ParamField>
+
+<ParamField query="start" type="string">
+  RFC3339 start time filter.
+</ParamField>
+
+<ParamField query="end" type="string">
+  RFC3339 end time filter.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeMarketTrades>` — same structure as `getMarketTrades()`.
+
+```typescript
+const { trades, best_bid, best_ask } = await publicClient.getPublicMarketTrades({
+  product_id: 'BTC-USD',
+  limit: 10,
+});
+console.log(`Spread: ${parseFloat(best_ask) - parseFloat(best_bid)}`);
+```

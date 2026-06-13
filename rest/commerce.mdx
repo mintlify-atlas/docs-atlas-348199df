@@ -1,0 +1,251 @@
+---
+title: "CBCommerceClient: Crypto Payments, Charges & Checkouts"
+sidebarTitle: "Commerce"
+description: "CBCommerceClient integrates with Coinbase Commerce for creating crypto payment charges, hosted checkout pages, and handling payment event webhooks."
+---
+
+`CBCommerceClient` is the REST client for [Coinbase Commerce](https://docs.cdp.coinbase.com/commerce-onchain/docs/welcome) — Coinbase's payment processing platform. Use it to accept crypto payments by generating payment charges, building hosted checkout pages, and querying payment event history for webhook reconciliation.
+
+<Note>
+  Coinbase Commerce uses a **Commerce-specific API key** — separate from the CDP API keys used by the trading clients. Commerce keys are created from the [Coinbase Commerce dashboard](https://beta.commerce.coinbase.com/settings/security), not from the standard API Key Management page.
+</Note>
+
+## Installation
+
+```bash
+npm install coinbase-api
+```
+
+## Instantiation
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { CBCommerceClient } from 'coinbase-api';
+
+    const client = new CBCommerceClient({
+      apiKey: 'your_commerce_api_key',
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const { CBCommerceClient } = require('coinbase-api');
+
+    const client = new CBCommerceClient({
+      apiKey: 'your_commerce_api_key',
+    });
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  There is no sandbox environment for Coinbase Commerce. All API calls are live.
+</Warning>
+
+---
+
+## Charges
+
+A **charge** represents a single payment request for a specific amount. Once created, you redirect the buyer to Coinbase's hosted payment page or use the charge details to build your own payment UI.
+
+| Method | Description |
+|---|---|
+| `createCharge(params)` | Create a new payment charge |
+| `getAllCharges()` | List all charges |
+| `getCharge(params)` | Get a charge by code or ID |
+
+### Create a Charge
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const charge = await client.createCharge({
+      // Required: exact price
+      local_price: {
+        amount: '10.00',
+        currency: 'USD',
+      },
+      // 'fixed_price' for a set amount, 'no_price' for open donations
+      pricing_type: 'fixed_price',
+
+      // Optional metadata and redirect URLs
+      metadata: {
+        custom_field: 'order-12345',
+        custom_field_two: 'user-abc',
+      },
+      redirect_url: 'https://example.com/payment/success',
+      cancel_url: 'https://example.com/payment/cancel',
+    });
+
+    console.log('Hosted payment URL:', charge.data.hosted_url);
+    console.log('Charge code:', charge.data.code);
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const charge = await client.createCharge({
+      local_price: {
+        amount: '10.00',
+        currency: 'USD',
+      },
+      pricing_type: 'fixed_price',
+      metadata: {
+        custom_field: 'order-12345',
+      },
+      redirect_url: 'https://example.com/payment/success',
+      cancel_url: 'https://example.com/payment/cancel',
+    });
+
+    console.log('Hosted payment URL:', charge.data.hosted_url);
+    ```
+  </Tab>
+</Tabs>
+
+### List & Retrieve Charges
+
+```typescript
+// All charges
+const charges = await client.getAllCharges();
+
+// A specific charge by its order code or UUID
+const charge = await client.getCharge({
+  charge_code_or_charge_id: 'CHARGE-CODE',
+});
+```
+
+---
+
+## Checkouts
+
+A **checkout** is a reusable payment page configuration. Unlike a charge (one-time use), a checkout can generate multiple charges over time — useful for recurring payment buttons or product pages.
+
+| Method | Description |
+|---|---|
+| `createCheckout(params)` | Create a reusable checkout session |
+| `getAllCheckouts()` | List all checkouts |
+| `getCheckout(params)` | Get a specific checkout by ID |
+
+### Create a Checkout
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    const checkout = await client.createCheckout({
+      // Required: price configuration
+      total_price: {
+        amount: '49.99',
+        currency: 'USD',
+      },
+      pricing_type: 'fixed_price',
+
+      // Optional: collect information from the buyer
+      requested_info: ['name', 'email'],
+
+      metadata: {
+        custom_field: 'premium-plan',
+      },
+    });
+
+    console.log('Checkout ID:', checkout.data.id);
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const checkout = await client.createCheckout({
+      total_price: {
+        amount: '49.99',
+        currency: 'USD',
+      },
+      pricing_type: 'fixed_price',
+      requested_info: ['name', 'email'],
+    });
+
+    console.log('Checkout ID:', checkout.data.id);
+    ```
+  </Tab>
+</Tabs>
+
+### List & Retrieve Checkouts
+
+```typescript
+// All checkouts
+const checkouts = await client.getAllCheckouts();
+
+// A specific checkout
+const checkout = await client.getCheckout({
+  checkout_id: 'checkout-uuid',
+});
+```
+
+---
+
+## Events
+
+Coinbase Commerce fires webhook events as payment states change (e.g. `charge:pending`, `charge:confirmed`, `charge:failed`). The Events API lets you query these programmatically for reconciliation and debugging.
+
+<Warning>
+  The `listEvents` and `showEvent` methods require a `X-CC-Version` header to be passed explicitly. Pass it as the first argument to both methods.
+</Warning>
+
+| Method | Description |
+|---|---|
+| `listEvents(headers)` | List all events |
+| `showEvent(params, headers)` | Get details for a specific event |
+
+```typescript
+const versionHeader = { 'X-CC-Version': '2018-03-22' };
+
+// List all events
+const events = await client.listEvents(versionHeader);
+
+// Get a specific event (e.g. from a received webhook)
+const event = await client.showEvent(
+  { event_id: 'event-uuid' },
+  versionHeader,
+);
+
+console.log('Event type:', event.data.type);
+console.log('Event resource:', event.data.data);
+```
+
+---
+
+## Typical Payment Flow
+
+<Steps>
+  <Step title="Create a charge">
+    Call `createCharge()` with the amount, currency, and `pricing_type`. Store the returned charge `id` and `code` in your database against your order.
+  </Step>
+  <Step title="Redirect the buyer">
+    Send the buyer to `charge.data.hosted_url` for Coinbase's hosted payment page, or use the raw charge data to render your own UI.
+  </Step>
+  <Step title="Receive webhooks">
+    Coinbase Commerce will POST events to your webhook endpoint as the payment progresses through `pending → confirmed → resolved` (or `expired` / `failed`).
+  </Step>
+  <Step title="Verify via API">
+    Use `getCharge()` or `showEvent()` to independently verify payment status without relying solely on the incoming webhook payload.
+  </Step>
+</Steps>
+
+---
+
+## Pricing Types
+
+| `pricing_type` | Behaviour |
+|---|---|
+| `fixed_price` | Buyer pays the exact `local_price` amount |
+| `no_price` | Open-ended (buyer chooses the amount — suitable for donations) |
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Trade Client" icon="chart-line" href="/rest/advanced-trade">
+    Trading orders, portfolios, and futures
+  </Card>
+  <Card title="Coinbase App Client" icon="mobile" href="/rest/coinbase-app">
+    Consumer wallet accounts and crypto prices
+  </Card>
+</CardGroup>

@@ -1,0 +1,343 @@
+---
+title: "CBPrimeClient API Reference — Institutional Custody & Trading"
+sidebarTitle: "Prime API"
+description: "Full method reference for CBPrimeClient — Coinbase Prime API for institutional portfolio management, order execution, custody wallets, financing, and allocations."
+---
+
+`CBPrimeClient` is the REST client for the [Coinbase Prime API](https://docs.cdp.coinbase.com/prime/docs/welcome) — a full-service institutional platform combining custody, trading, and financing. All endpoints require authentication. The API is scoped around `entity_id` (your organisation) and `portfolio_id` (a trading/custody sub-account).
+
+## Installation & Setup
+
+```typescript
+import { CBPrimeClient } from 'coinbase-api';
+
+const client = new CBPrimeClient({
+  apiKey: 'YOUR_API_KEY',
+  apiSecret: 'YOUR_API_SECRET',
+  apiPassphrase: 'YOUR_API_PASSPHRASE',
+});
+```
+
+<Note>
+  All Prime endpoints are authenticated. The `apiKey`, `apiSecret`, and `apiPassphrase` must be generated in the Coinbase Prime portal. There is no public sandbox for Prime.
+</Note>
+
+---
+
+## All Methods
+
+| Method | Auth | HTTP | Endpoint |
+|--------|:----:|:----:|----------|
+| **Activities** | | | |
+| `getActivities()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/activities` |
+| `getActivityById()` | 🔒 | GET | `/v1/activities/{activity_id}` |
+| `getEntityActivities()` | 🔒 | GET | `/v1/entities/{entity_id}/activities` |
+| `getPortfolioActivityById()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/activities/{activity_id}` |
+| **Allocations** | | | |
+| `createPortfolioAllocations()` | 🔒 | POST | `/v1/allocations` |
+| `createPortfolioNetAllocations()` | 🔒 | POST | `/v1/allocations/net` |
+| `getPortfolioAllocations()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/allocations` |
+| `getAllocationById()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/allocations/{allocation_id}` |
+| `getNetAllocationsByNettingId()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/allocations/net/{netting_id}` |
+| **Financing** | | | |
+| `getEntityAccruals()` | 🔒 | GET | `/v1/entities/{entity_id}/accruals` |
+| `getEntityLocateAvailabilities()` | 🔒 | GET | `/v1/entities/{entity_id}/locates_availability` |
+| `getEntityMargin()` | 🔒 | GET | `/v1/entities/{entity_id}/margin` |
+| `getEntityMarginSummaries()` | 🔒 | GET | `/v1/entities/{entity_id}/margin_summaries` |
+| `getEntityTFTieredFees()` | 🔒 | GET | `/v1/entities/{entity_id}/tf_tiered_fees` |
+| `getPortfolioAccruals()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/accruals` |
+| `getPortfolioBuyingPower()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/buying_power` |
+| `getPortfolioLocates()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/locates` |
+| `getPortfolioMarginConversions()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/margin_conversions` |
+| `getPortfolioWithdrawalPower()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/withdrawal_power` |
+| **Invoices** | | | |
+| `getInvoices()` | 🔒 | GET | `/v1/entities/{entity_id}/invoices` |
+| **Positions** | | | |
+| `getEntityAggregatePositions()` | 🔒 | GET | `/v1/entities/{entity_id}/aggregate_positions` |
+| `getEntityPositions()` | 🔒 | GET | `/v1/entities/{entity_id}/positions` |
+| **Assets** | | | |
+| `getAssets()` | 🔒 | GET | `/v1/entities/{entity_id}/assets` |
+| **Payment Methods** | | | |
+| `getEntityPaymentMethods()` | 🔒 | GET | `/v1/entities/{entity_id}/payment-methods` |
+| `getEntityPaymentMethod()` | 🔒 | GET | `/v1/entities/{entity_id}/payment-methods/{payment_method_id}` |
+| **Users** | | | |
+| `getUsers()` | 🔒 | GET | `/v1/entities/{entity_id}/users` |
+| `getPortfolioUsers()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/users` |
+| **Portfolios** | | | |
+| `getPortfolios()` | 🔒 | GET | `/v1/portfolios` |
+| `getPortfolioById()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}` |
+| `getPortfolioCreditInformation()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/credit` |
+| **Address Book** | | | |
+| `getAddressBook()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/address_book` |
+| `createAddressBookEntry()` | 🔒 | POST | `/v1/portfolios/{portfolio_id}/address_book` |
+| **Balances** | | | |
+| `getPortfolioBalances()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/balances` |
+| `getWalletBalance()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/wallets/{wallet_id}/balance` |
+| `getWeb3WalletBalances()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/wallets/{wallet_id}/web3_balances` |
+| **Commission** | | | |
+| `getPortfolioCommission()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/commission` |
+| **Orders** | | | |
+| `getPortfolioFills()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/fills` |
+| `getOpenOrders()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/open_orders` |
+| `submitOrder()` | 🔒 | POST | `/v1/portfolios/{portfolio_id}/order` |
+| `getOrderPreview()` | 🔒 | POST | `/v1/portfolios/{portfolio_id}/order_preview` |
+| `getPortfolioOrders()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/orders` |
+| `getOrderById()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/orders/{order_id}` |
+| `cancelOrder()` | 🔒 | POST | `/v1/portfolios/{portfolio_id}/orders/{order_id}/cancel` |
+| `getOrderFills()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/orders/{order_id}/fills` |
+| **Products** | | | |
+| `getPortfolioProducts()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/products` |
+| **Transactions** | | | |
+| `getPortfolioTransactions()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/transactions` |
+| `getTransactionById()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/transactions/{transaction_id}` |
+| **Wallet Transfers & Conversions** | | | |
+| `createConversion()` | 🔒 | POST | `/v1/portfolios/{portfolio_id}/wallets/{wallet_id}/conversion` |
+| `getWalletTransactions()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/wallets/{wallet_id}/transactions` |
+| `createTransfer()` | 🔒 | POST | `/v1/portfolios/{portfolio_id}/wallets/{wallet_id}/transfers` |
+| `createWithdrawal()` | 🔒 | POST | `/v1/portfolios/{portfolio_id}/wallets/{wallet_id}/withdrawals` |
+| **Wallets** | | | |
+| `getPortfolioWallets()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/wallets` |
+| `createWallet()` | 🔒 | POST | `/v1/portfolios/{portfolio_id}/wallets` |
+| `getWalletById()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/wallets/{wallet_id}` |
+| `getWalletDepositInstructions()` | 🔒 | GET | `/v1/portfolios/{portfolio_id}/wallets/{wallet_id}/deposit_instructions` |
+
+---
+
+## Activities
+
+Activities track all significant events within a portfolio or entity (orders, transfers, conversions, etc.).
+
+```typescript
+// Portfolio-level activities
+const { activities } = await client.getActivities({
+  portfolio_id: 'portfolio-uuid',
+  start_time: '2025-01-01T00:00:00Z',
+  end_time: '2025-01-31T00:00:00Z',
+});
+
+// Entity-level activities (all portfolios)
+const entityActivities = await client.getEntityActivities({
+  entity_id: 'entity-uuid',
+});
+
+// Look up a specific activity
+const activity = await client.getActivityById({ activity_id: 'activity-uuid' });
+```
+
+---
+
+## Allocations
+
+Allocations distribute executed orders across multiple sub-portfolios. Use `createPortfolioAllocations` for standard allocations and `createPortfolioNetAllocations` for net (netting) allocations.
+
+```typescript
+const allocation = await client.createPortfolioAllocations({
+  allocation_id: 'my-alloc-uuid',
+  source_portfolio_id: 'source-portfolio-uuid',
+  product_id: 'BTC-USD',
+  order_ids: ['order-uuid-1', 'order-uuid-2'],
+  allocation_legs: [
+    { allocation_leg_id: 'leg-1', destination_portfolio_id: 'dest-a', amount: '0.5' },
+    { allocation_leg_id: 'leg-2', destination_portfolio_id: 'dest-b', amount: '0.5' },
+  ],
+  size_type: 'PERCENT',
+});
+
+// Retrieve allocations for a portfolio
+const { allocations } = await client.getPortfolioAllocations({
+  portfolio_id: 'portfolio-uuid',
+});
+```
+
+---
+
+## Orders
+
+### `submitOrder(params)`
+
+Places a new order on a portfolio. A `client_order_id` is auto-generated if not supplied.
+
+<ParamField body="portfolio_id" type="string" required>Portfolio UUID.</ParamField>
+<ParamField body="product_id" type="string" required>Trading pair, e.g. `"BTC-USD"`.</ParamField>
+<ParamField body="side" type="string" required>`"BUY"` or `"SELL"`.</ParamField>
+<ParamField body="type" type="string" required>`"MARKET"`, `"LIMIT"`, `"TWAP"`, `"VWAP"`, `"STOP_LIMIT"`.</ParamField>
+<ParamField body="base_quantity" type="string">Amount in base currency (e.g. BTC).</ParamField>
+<ParamField body="quote_value" type="string">Amount in quote currency (e.g. USD). Used for market buys.</ParamField>
+<ParamField body="limit_price" type="string">Limit price. Required for limit orders.</ParamField>
+<ParamField body="client_order_id" type="string">Client-side idempotency key.</ParamField>
+<ParamField body="time_in_force" type="string">`"GOOD_UNTIL_CANCELLED"`, `"GOOD_UNTIL_DATE_TIME"`, `"IMMEDIATE_OR_CANCEL"`, `"FILL_OR_KILL"`.</ParamField>
+<ParamField body="start_time" type="string">Algo order start time (ISO 8601).</ParamField>
+<ParamField body="expiry_time" type="string">GTD expiry time (ISO 8601).</ParamField>
+
+```typescript
+const order = await client.submitOrder({
+  portfolio_id: 'portfolio-uuid',
+  product_id: 'BTC-USD',
+  side: 'BUY',
+  type: 'LIMIT',
+  base_quantity: '0.1',
+  limit_price: '60000.00',
+  time_in_force: 'GOOD_UNTIL_CANCELLED',
+});
+console.log(order.order_id, order.status);
+```
+
+### `getOrderPreview(params)`
+
+Previews an order without submitting it. Returns estimated fill price, fees, and slippage.
+
+```typescript
+const preview = await client.getOrderPreview({
+  portfolio_id: 'portfolio-uuid',
+  product_id: 'BTC-USD',
+  side: 'BUY',
+  type: 'MARKET',
+  quote_value: '10000',
+});
+console.log(preview.average_filled_price, preview.commission);
+```
+
+### `getPortfolioFills(params)`
+
+Returns completed fills for a portfolio. Requires `start_date`. Returns up to 100 fills by default (max 3000).
+
+```typescript
+const fills = await client.getPortfolioFills({
+  portfolio_id: 'portfolio-uuid',
+  start_date: '2025-01-01T00:00:00Z',
+  end_date: '2025-01-31T00:00:00Z',
+});
+```
+
+### `cancelOrder(params)`
+
+Cancels an open order. Filled orders cannot be cancelled.
+
+```typescript
+await client.cancelOrder({
+  portfolio_id: 'portfolio-uuid',
+  order_id: 'order-uuid',
+});
+```
+
+---
+
+## Wallets
+
+Wallets are custody accounts within a portfolio that hold specific assets.
+
+### `getPortfolioWallets(params)` / `createWallet(params)` / `getWalletById(params)`
+
+```typescript
+const { wallets } = await client.getPortfolioWallets({
+  portfolio_id: 'portfolio-uuid',
+  type: 'VAULT',
+});
+
+const newWallet = await client.createWallet({
+  portfolio_id: 'portfolio-uuid',
+  name: 'BTC Cold Storage',
+  symbol: 'BTC',
+  wallet_type: 'VAULT',
+});
+
+const wallet = await client.getWalletById({
+  portfolio_id: 'portfolio-uuid',
+  wallet_id: 'wallet-uuid',
+});
+```
+
+### `getWalletDepositInstructions(params)`
+
+Returns on-chain deposit address and memo/tag for a wallet.
+
+```typescript
+const instructions = await client.getWalletDepositInstructions({
+  portfolio_id: 'portfolio-uuid',
+  wallet_id: 'wallet-uuid',
+  deposit_type: 'CRYPTO',
+});
+console.log(instructions.crypto_deposit_address);
+```
+
+### `createTransfer(params)`
+
+Initiates an internal wallet-to-wallet transfer within Prime.
+
+<ParamField body="portfolio_id" type="string" required>Source portfolio UUID.</ParamField>
+<ParamField body="wallet_id" type="string" required>Source wallet UUID.</ParamField>
+<ParamField body="amount" type="string" required>Amount to transfer.</ParamField>
+<ParamField body="destination" type="string" required>Destination wallet UUID or address.</ParamField>
+<ParamField body="idempotency_id" type="string" required>Client-generated UUID for idempotency.</ParamField>
+
+```typescript
+await client.createTransfer({
+  portfolio_id: 'portfolio-uuid',
+  wallet_id: 'source-wallet-uuid',
+  amount: '1000',
+  destination: 'destination-wallet-uuid',
+  idempotency_id: 'unique-transfer-id',
+});
+```
+
+### `createWithdrawal(params)`
+
+Withdraws funds from a wallet to an external address or payment method.
+
+---
+
+## Financing
+
+### `getPortfolioBuyingPower(params)`
+
+Returns available credit and buying power for a portfolio.
+
+```typescript
+const bp = await client.getPortfolioBuyingPower({
+  portfolio_id: 'portfolio-uuid',
+  symbol: 'BTC-USD',
+});
+console.log(bp.max_buy.amount, bp.max_sell.amount);
+```
+
+### `getEntityMargin(params)` / `getEntityMarginSummaries(params)`
+
+```typescript
+// Real-time margin model evaluation
+const margin = await client.getEntityMargin({ entity_id: 'entity-uuid' });
+
+// Historical margin call summaries
+const summaries = await client.getEntityMarginSummaries({
+  entity_id: 'entity-uuid',
+  start_time: '2025-01-01T00:00:00Z',
+  end_time: '2025-01-31T00:00:00Z',
+});
+```
+
+### `getEntityLocateAvailabilities(params)`
+
+Returns assets available for locating (short selling) with rates and quantities.
+
+```typescript
+const locates = await client.getEntityLocateAvailabilities({
+  entity_id: 'entity-uuid',
+});
+```
+
+---
+
+## Portfolios & Balances
+
+```typescript
+// List all accessible portfolios
+const { portfolios } = await client.getPortfolios();
+
+// Detailed portfolio information
+const portfolio = await client.getPortfolioById({ portfolio_id: 'portfolio-uuid' });
+
+// All balances (trading + vault + total)
+const balances = await client.getPortfolioBalances({
+  portfolio_id: 'portfolio-uuid',
+  balance_type: 'TOTAL_BALANCES',
+});
+```

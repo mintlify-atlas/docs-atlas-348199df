@@ -1,28 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Coinbase API SDK",
+  "projectType": "sdk-library",
+  "projectName": "Coinbase API SDK",
+  "projectDescription": "A complete JavaScript/TypeScript/Node.js SDK for all Coinbase REST APIs and WebSockets, covering Advanced Trade, App, Exchange, International, Prime, and Commerce platforms.",
   "theme": "luma",
-  "colors": {
-    "primary": "#0d152d",
-    "light": "#848c94",
-    "dark": "#c9cacf"
-  },
-  "favicon": "https://media.brand.dev/9af7ca08-5ac3-49fd-9432-5a2e6574303c.svg",
-  "logo": {
-    "light": "https://media.brand.dev/74afcedb-15a5-48fa-81f6-92d9c570adc6.svg",
-    "dark": "https://media.brand.dev/1964742a-4107-4ee0-b925-4e79b3624e89.svg"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/tiagosiebler/coinbase-api"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/tiagosiebler/coinbase-api"
-    }
-  },
+  "primaryColor": "#0d152d",
+  "lightColor": "#848c94",
+  "darkColor": "#c9cacf",
   "navigation": {
     "tabs": [
       {
@@ -100,5 +83,32 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Six dedicated REST clients: CBAdvancedTradeClient, CBAppClient, CBExchangeClient, CBInternationalClient, CBPrimeClient, CBCommerceClient",
+    "Unified WebsocketClient covering all Coinbase WebSocket feeds with auto-reconnect and resubscription",
+    "Full TypeScript support with strongly-typed request and response types",
+    "Supports both ECDSA and ED25519 API key formats with automatic detection",
+    "JWT-based authentication for Advanced Trade & App APIs; passphrase-based for Exchange, International & Prime",
+    "Sandbox/testnet support for Exchange and International APIs",
+    "ESM and CJS dual-module output; browser bundle via webpack",
+    "Proxy support via axios integration",
+    "Customisable logging with DefaultLogger override pattern",
+    "Bundled llms.txt for AI/LLM-assisted development"
+  ],
+  "publicApiSurface": [
+    "CBAdvancedTradeClient",
+    "CBAppClient",
+    "CBExchangeClient",
+    "CBInternationalClient",
+    "CBPrimeClient",
+    "CBCommerceClient",
+    "WebsocketClient",
+    "WS_KEY_MAP",
+    "WsKey",
+    "RestClientOptions",
+    "DefaultLogger",
+    "WsTopicRequest",
+    "WSConnectedResult"
+  ]
 }

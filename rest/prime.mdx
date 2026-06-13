@@ -1,0 +1,340 @@
+---
+title: "CBPrimeClient: Institutional Custody & Order Management"
+sidebarTitle: "Prime"
+description: "CBPrimeClient connects to the Coinbase Prime API for institutional portfolio management, allocations, financing, custody wallets, and order execution."
+---
+
+`CBPrimeClient` is the REST client for the [Coinbase Prime API](https://docs.cdp.coinbase.com/prime/docs/welcome) — Coinbase's institutional offering that combines custody, trading, and financing in a single platform. It is scoped to entities and portfolios, with separate endpoints for trading balances, vault balances, wallet management, web3 wallets, and order execution.
+
+<Note>
+  Coinbase Prime uses **API key + secret + passphrase** authentication. No sandbox is available — all API calls interact with the live Prime environment.
+</Note>
+
+## Installation
+
+```bash
+npm install coinbase-api
+```
+
+## Instantiation
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { CBPrimeClient } from 'coinbase-api';
+
+    const client = new CBPrimeClient({
+      apiKey: 'your_prime_api_key',
+      apiSecret: 'your_prime_api_secret',
+      apiPassphrase: 'your_prime_api_passphrase',
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const { CBPrimeClient } = require('coinbase-api');
+
+    const client = new CBPrimeClient({
+      apiKey: 'your_prime_api_key',
+      apiSecret: 'your_prime_api_secret',
+      apiPassphrase: 'your_prime_api_passphrase',
+    });
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  There is no sandbox for Coinbase Prime. All requests are made against the production environment at `https://api.prime.coinbase.com`.
+</Warning>
+
+---
+
+## Activities
+
+Activities capture the history of all operations on a portfolio or entity — orders, transfers, conversions, and more.
+
+| Method | Description |
+|---|---|
+| `getActivities(params)` | List all activities for a portfolio |
+| `getActivityById(params)` | Retrieve any activity by ID |
+| `getEntityActivities(params)` | List all activities for an entity |
+| `getPortfolioActivityById(params)` | Get an activity scoped to a specific portfolio |
+
+```typescript
+// List recent portfolio activities
+const activities = await client.getActivities({
+  portfolio_id: 'your-portfolio-id',
+  page_size: 50,
+});
+
+// Get a single activity from any portfolio
+const activity = await client.getActivityById({
+  activity_id: 'activity-uuid',
+});
+
+// Entity-level activity log
+const entityActivities = await client.getEntityActivities({
+  entity_id: 'your-entity-id',
+});
+```
+
+---
+
+## Allocations
+
+Allocations distribute executed fills across sub-portfolios after a block trade. Both standard and net allocation types are supported.
+
+| Method | Description |
+|---|---|
+| `createPortfolioAllocations(params)` | Create an allocation for a portfolio |
+| `createPortfolioNetAllocations(params)` | Create a net allocation |
+| `getPortfolioAllocations(params)` | List historical allocations |
+| `getAllocationById(params)` | Get a specific allocation |
+| `getNetAllocationsByNettingId(params)` | Get net allocations by netting ID |
+
+```typescript
+// List all allocations for a portfolio
+const allocations = await client.getPortfolioAllocations({
+  portfolio_id: 'your-portfolio-id',
+  start_date: '2024-01-01T00:00:00Z',
+  end_date: '2024-01-31T23:59:59Z',
+});
+
+const allocation = await client.getAllocationById({
+  portfolio_id: 'your-portfolio-id',
+  allocation_id: 'allocation-uuid',
+});
+```
+
+---
+
+## Balances & Margin
+
+Query buying power, withdrawal limits, margin health, and portfolio-level balances. Balances can be split by type: trading, vault, or total.
+
+| Method | Description |
+|---|---|
+| `getPortfolioBuyingPower(params)` | Buying power based on holdings and available credit |
+| `getPortfolioWithdrawalPower(params)` | Max withdrawable quantity for an asset |
+| `getPortfolioBalances(params)` | List all portfolio balances by type |
+| `getWalletBalance(params)` | Balance for a specific wallet |
+| `getEntityMargin(params)` | Real-time margin evaluation for an entity |
+| `getEntityMarginSummaries(params)` | Historical margin call summaries |
+| `getPortfolioMarginConversions(params)` | Margin conversions (deprecated — use entity margin summaries) |
+
+```typescript
+// Buying power for a product
+const power = await client.getPortfolioBuyingPower({
+  portfolio_id: 'your-portfolio-id',
+  symbol: 'BTC-USD',
+});
+
+// Total balances across vault and trading
+const balances = await client.getPortfolioBalances({
+  portfolio_id: 'your-portfolio-id',
+  balance_type: 'TOTAL_BALANCES',
+});
+
+// Real-time margin check at entity level
+const margin = await client.getEntityMargin({
+  entity_id: 'your-entity-id',
+});
+```
+
+---
+
+## Orders
+
+All order operations are scoped to a portfolio. Prime supports full order lifecycle management including previews, fills, and cancellations.
+
+| Method | Description |
+|---|---|
+| `submitOrder(params)` | Create an order for a portfolio |
+| `getOrderPreview(params)` | Preview an order before submitting |
+| `getOpenOrders(params)` | List open orders for a portfolio |
+| `getPortfolioOrders(params)` | List historical orders for a portfolio |
+| `getOrderById(params)` | Get a specific order |
+| `cancelOrder(params)` | Cancel an open order |
+| `getPortfolioFills(params)` | List fills for a portfolio |
+| `getOrderFills(params)` | List fills for a specific order |
+
+<CodeGroup>
+  ```typescript Place an order
+  const order = await client.submitOrder({
+    portfolio_id: 'your-portfolio-id',
+    product_id: 'BTC-USD',
+    side: 'BUY',
+    type: 'LIMIT',
+    base_quantity: '0.1',
+    limit_price: '30000',
+    client_order_id: 'my-prime-order-001',
+  });
+  ```
+
+  ```typescript Preview first
+  const preview = await client.getOrderPreview({
+    portfolio_id: 'your-portfolio-id',
+    product_id: 'ETH-USD',
+    side: 'SELL',
+    type: 'MARKET',
+    base_quantity: '1',
+  });
+  ```
+
+  ```typescript List & cancel
+  const open = await client.getOpenOrders({
+    portfolio_id: 'your-portfolio-id',
+  });
+
+  await client.cancelOrder({
+    portfolio_id: 'your-portfolio-id',
+    order_id: open.orders[0].id,
+  });
+  ```
+
+  ```typescript Get fills
+  const fills = await client.getPortfolioFills({
+    portfolio_id: 'your-portfolio-id',
+    start_date: '2024-01-01T00:00:00Z',
+  });
+  ```
+</CodeGroup>
+
+---
+
+## Wallets
+
+Custody wallets hold assets within your Prime portfolios. You can create wallets, retrieve balances and deposit instructions, and initiate transfers or withdrawals.
+
+| Method | Description |
+|---|---|
+| `getPortfolioWallets(params)` | List all wallets for a portfolio |
+| `createWallet(params)` | Create a new wallet |
+| `getWalletById(params)` | Get a specific wallet |
+| `getWalletBalance(params)` | Get the balance of a wallet |
+| `getWalletDepositInstructions(params)` | Get deposit address/instructions |
+| `getWalletTransactions(params)` | List transactions for a wallet |
+| `createTransfer(params)` | Transfer funds between wallets |
+| `createWithdrawal(params)` | Create a withdrawal from a wallet |
+
+```typescript
+// List trading wallets
+const wallets = await client.getPortfolioWallets({
+  portfolio_id: 'your-portfolio-id',
+  type: 'TRADING',
+});
+
+// Get deposit address for a specific wallet
+const instructions = await client.getWalletDepositInstructions({
+  portfolio_id: 'your-portfolio-id',
+  wallet_id: 'btc-wallet-uuid',
+  deposit_type: 'CRYPTO',
+});
+
+// Withdraw from a vault wallet
+await client.createWithdrawal({
+  portfolio_id: 'your-portfolio-id',
+  wallet_id: 'vault-wallet-uuid',
+  amount: '0.5',
+  destination_type: 'CRYPTO_ADDRESS',
+  crypto_address: 'your-external-btc-address',
+  currency_symbol: 'BTC',
+  idempotency_key: 'withdraw-001',
+});
+```
+
+---
+
+## Portfolios
+
+Portfolios are the top-level account unit in Prime. Each entity can have multiple portfolios, each with independent balances, orders, and wallets.
+
+| Method | Description |
+|---|---|
+| `getPortfolios()` | List all portfolios the key has read access to |
+| `getPortfolioById(params)` | Get a portfolio by ID |
+| `getPortfolioCreditInformation(params)` | Get post-trade credit information |
+| `getPortfolioCommission(params)` | Get commission rates |
+| `getPortfolioProducts(params)` | List tradeable products for a portfolio |
+| `getPortfolioTransactions(params)` | List transactions affecting balances |
+| `getTransactionById(params)` | Get a specific transaction |
+| `createConversion(params)` | Convert between assets in a wallet |
+
+```typescript
+const portfolios = await client.getPortfolios();
+
+const credit = await client.getPortfolioCreditInformation({
+  portfolio_id: 'your-portfolio-id',
+});
+```
+
+---
+
+## Financing
+
+Prime offers financing features including interest accruals, locates for short selling, and margin summaries at the entity level.
+
+| Method | Description |
+|---|---|
+| `getEntityAccruals(params)` | List interest accruals for an entity |
+| `getEntityLocateAvailabilities(params)` | Get available short locates |
+| `getPortfolioAccruals(params)` | List interest accruals for a portfolio |
+| `getPortfolioLocates(params)` | List existing locates |
+| `getInvoices(params)` | List invoices for an entity |
+
+```typescript
+const accruals = await client.getEntityAccruals({
+  entity_id: 'your-entity-id',
+  start_date: '2024-01-01',
+  end_date: '2024-01-31',
+});
+
+const locates = await client.getEntityLocateAvailabilities({
+  entity_id: 'your-entity-id',
+});
+```
+
+---
+
+## Address Book
+
+Manage trusted withdrawal addresses at the portfolio level.
+
+```typescript
+// List trusted addresses
+const book = await client.getAddressBook({
+  portfolio_id: 'your-portfolio-id',
+});
+
+// Add a new trusted address
+await client.createAddressBookEntry({
+  portfolio_id: 'your-portfolio-id',
+  address: '0xYourAddress',
+  currency_symbol: 'ETH',
+  name: 'Hot Wallet',
+});
+```
+
+---
+
+## Users
+
+Inspect which users are associated with your entity or portfolio.
+
+| Method | Description |
+|---|---|
+| `getUsers(params)` | List users for an entity |
+| `getPortfolioUsers(params)` | List users for a portfolio |
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="International Client" icon="globe" href="/rest/international">
+    Cross-border institutional trading and perpetuals
+  </Card>
+  <Card title="Exchange Client" icon="building-columns" href="/rest/exchange">
+    Professional trading with profiles and conversions
+  </Card>
+</CardGroup>

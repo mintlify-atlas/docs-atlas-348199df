@@ -1,0 +1,366 @@
+---
+title: "Advanced Trade Portfolios & Perpetuals API Reference"
+sidebarTitle: "Portfolios"
+description: "Manage Coinbase Advanced Trade portfolios — create, update, delete, and move funds between portfolios. Also covers perpetuals positions and multi-asset collateral."
+---
+
+The Portfolios endpoints let you create and manage sub-portfolios within your Advanced Trade account and transfer funds between them. The Perpetuals (Intx) section extends this with endpoints for querying perpetuals positions and collateral balances on the Coinbase International Exchange, allocating portfolio funds to sub-portfolios, and enabling or disabling multi-asset collateral.
+
+---
+
+## getPortfolios
+
+List all portfolios belonging to the current user. Optionally filter by portfolio type.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/portfolios` |
+
+<ParamField query="portfolio_type" type="string">
+  Filter by type: `"DEFAULT"`, `"CONSUMER"`, `"INTX"`, or `"UNDEFINED"`.
+</ParamField>
+
+**Returns:** `Promise<{ portfolios: AdvTradePortfolio[] }>` — each portfolio has `uuid`, `name`, `type`, and `deleted` flag.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your-api-key-name',
+  apiSecret: '-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n',
+});
+
+const { portfolios } = await client.getPortfolios();
+portfolios.forEach(p => console.log(`${p.name} (${p.uuid}): ${p.type}`));
+```
+
+---
+
+## createPortfolio
+
+Create a new portfolio with a given name.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/portfolios` |
+
+<ParamField body="name" type="string" required>
+  The display name for the new portfolio.
+</ParamField>
+
+**Returns:** `Promise<{ portfolio: AdvTradePortfolio }>` — the newly created portfolio record.
+
+```typescript
+const { portfolio } = await client.createPortfolio({ name: 'Algo Strategy 1' });
+console.log('Created portfolio UUID:', portfolio.uuid);
+```
+
+---
+
+## movePortfolioFunds
+
+Transfer funds between two portfolios owned by the same user.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/portfolios/move_funds` |
+
+<ParamField body="funds" type="object" required>
+  Amount to transfer. An object with:
+  - `value` (string) — decimal amount, e.g. `"100.00"`
+  - `currency` (string) — asset currency code, e.g. `"USD"`
+</ParamField>
+
+<ParamField body="source_portfolio_uuid" type="string" required>
+  UUID of the portfolio to transfer funds from.
+</ParamField>
+
+<ParamField body="target_portfolio_uuid" type="string" required>
+  UUID of the portfolio to transfer funds into.
+</ParamField>
+
+**Returns:** `Promise<{ source_portfolio_uuid: string; target_portfolio_uuid: string }>` — confirms the UUIDs of the two portfolios involved.
+
+```typescript
+await client.movePortfolioFunds({
+  funds: { value: '500.00', currency: 'USD' },
+  source_portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+  target_portfolio_uuid: 'e5f6a7b8-0000-0000-0000-222222222222',
+});
+console.log('Funds transferred successfully');
+```
+
+---
+
+## getPortfolioBreakdown
+
+Retrieve a detailed breakdown of a portfolio, including spot positions, perpetuals positions, futures positions, and balance summaries.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/portfolios/{portfolio_uuid}` |
+
+<ParamField path="portfolio_uuid" type="string" required>
+  UUID of the portfolio to retrieve.
+</ParamField>
+
+<ParamField query="currency" type="string">
+  Express monetary values in this currency, e.g. `"EUR"`.
+</ParamField>
+
+**Returns:** `Promise<{ breakdown: AdvTradePortfolioBreakdown }>` — contains the nested `portfolio` record, `portfolio_balances` (totals across asset classes), `spot_positions`, `perp_positions`, and `futures_positions`.
+
+```typescript
+const { breakdown } = await client.getPortfolioBreakdown({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+});
+
+const { total_balance, total_crypto_balance } = breakdown.portfolio_balances;
+console.log(`Total balance: ${total_balance.value} ${total_balance.currency}`);
+console.log(`Spot positions: ${breakdown.spot_positions.length}`);
+```
+
+---
+
+## deletePortfolio
+
+Permanently delete a portfolio. The portfolio must be empty before it can be deleted.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `DELETE /api/v3/brokerage/portfolios/{portfolio_uuid}` |
+
+<ParamField path="portfolio_uuid" type="string" required>
+  UUID of the portfolio to delete.
+</ParamField>
+
+**Returns:** `Promise<any>` — an empty response on success.
+
+```typescript
+await client.deletePortfolio({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+});
+console.log('Portfolio deleted');
+```
+
+---
+
+## updatePortfolio
+
+Rename an existing portfolio.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `PUT /api/v3/brokerage/portfolios/{portfolio_uuid}` |
+
+<ParamField path="portfolio_uuid" type="string" required>
+  UUID of the portfolio to update.
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  The new display name for the portfolio.
+</ParamField>
+
+**Returns:** `Promise<{ portfolio: AdvTradePortfolio }>` — the updated portfolio record.
+
+```typescript
+const { portfolio } = await client.updatePortfolio({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+  name: 'Momentum Strategy Q2',
+});
+console.log('Renamed to:', portfolio.name);
+```
+
+---
+
+## Perpetuals Endpoints
+
+The following endpoints interact with the Coinbase International Exchange (Intx) perpetuals platform associated with a portfolio.
+
+---
+
+## allocatePortfolio
+
+Allocate funds from a portfolio to a sub-portfolio on the Intx perpetuals platform for a specific symbol.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/intx/allocate` |
+
+<ParamField body="portfolio_uuid" type="string" required>
+  UUID of the parent portfolio.
+</ParamField>
+
+<ParamField body="symbol" type="string" required>
+  The perpetuals symbol to allocate funds to, e.g. `"BTC-PERP-INTX"`.
+</ParamField>
+
+<ParamField body="amount" type="string" required>
+  The amount to allocate as a decimal string, e.g. `"1000.00"`.
+</ParamField>
+
+<ParamField body="currency" type="string" required>
+  The currency of the allocation amount, e.g. `"USD"`.
+</ParamField>
+
+**Returns:** `Promise<any>` — an empty response on success.
+
+```typescript
+await client.allocatePortfolio({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+  symbol: 'BTC-PERP-INTX',
+  amount: '1000.00',
+  currency: 'USD',
+});
+console.log('Allocation successful');
+```
+
+---
+
+## getPerpetualsPortfolioSummary
+
+Retrieve a summary of your perpetuals portfolio, including collateral, unrealised PnL, and buying power.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/intx/portfolio/{portfolio_uuid}` |
+
+<ParamField path="portfolio_uuid" type="string" required>
+  UUID of the portfolio to summarise.
+</ParamField>
+
+**Returns:** `Promise<AdvTradePerpetualsPortfolio>` — contains a `portfolios` array (each with collateral, margin, PnL, and balance details) and a top-level `summary` with aggregated `unrealized_pnl`, `buying_power`, `total_balance`, and `max_withdrawal_amount`.
+
+```typescript
+const summary = await client.getPerpetualsPortfolioSummary({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+});
+
+console.log('Buying power:', summary.summary.buying_power.value);
+console.log('Unrealised PnL:', summary.summary.unrealized_pnl.value);
+```
+
+---
+
+## getPerpetualsPositions
+
+List all open perpetuals positions for a given portfolio.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/intx/positions/{portfolio_uuid}` |
+
+<ParamField path="portfolio_uuid" type="string" required>
+  UUID of the portfolio whose positions to list.
+</ParamField>
+
+**Returns:** `Promise<AdvTradePerpetualsPositionSummary>` — contains a `positions` array (each `AdvTradePerpetualsPosition` has `product_id`, `net_size`, `position_side`, `leverage`, `unrealized_pnl`, `mark_price`, `liquidation_price`, etc.) and a `summary` with `aggregated_pnl`.
+
+```typescript
+const { positions, summary } = await client.getPerpetualsPositions({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+});
+
+console.log(`Open positions: ${positions.length}`);
+console.log('Total PnL:', summary.aggregated_pnl.value);
+```
+
+---
+
+## getPerpetualsPosition
+
+Retrieve a single open perpetuals position by portfolio UUID and symbol.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/intx/positions/{portfolio_uuid}/{symbol}` |
+
+<ParamField path="portfolio_uuid" type="string" required>
+  UUID of the portfolio.
+</ParamField>
+
+<ParamField path="symbol" type="string" required>
+  The perpetuals symbol, e.g. `"BTC-PERP-INTX"`.
+</ParamField>
+
+**Returns:** `Promise<{ position: AdvTradePerpetualsPosition }>` — the full position record.
+
+```typescript
+const { position } = await client.getPerpetualsPosition({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+  symbol: 'BTC-PERP-INTX',
+});
+
+console.log(`Side: ${position.position_side}`);
+console.log(`Net size: ${position.net_size}`);
+console.log(`Leverage: ${position.leverage}`);
+```
+
+---
+
+## getPortfoliosBalances
+
+Retrieve asset balances on the Intx platform for a given portfolio.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/intx/balances/{portfolio_uuid}` |
+
+<ParamField path="portfolio_uuid" type="string" required>
+  UUID of the portfolio.
+</ParamField>
+
+**Returns:** `Promise<{ portfolio_balances: AdvTradePortfolioBalance[] }>` — each balance record contains the asset metadata (`asset_id`, `asset_name`, collateral weight), `quantity`, `hold`, `collateral_value`, and `max_withdraw_amount`.
+
+```typescript
+const { portfolio_balances } = await client.getPortfoliosBalances({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+});
+
+portfolio_balances.forEach(pb => {
+  pb.balances.forEach(b => {
+    console.log(`${b.asset.asset_name}: ${b.quantity} (collateral: ${b.collateral_value})`);
+  });
+});
+```
+
+---
+
+## updateMultiAssetCollateral
+
+Enable or disable multi-asset collateral for a given perpetuals portfolio.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/intx/multi_asset_collateral` |
+
+<ParamField body="portfolio_uuid" type="string">
+  UUID of the portfolio to update. Uses your default portfolio if omitted.
+</ParamField>
+
+<ParamField body="multi_asset_collateral_enabled" type="boolean">
+  Set to `true` to enable multi-asset collateral, `false` to disable it.
+</ParamField>
+
+**Returns:** `Promise<{ multi_asset_collateral_enabled: boolean }>` — confirms the new setting.
+
+```typescript
+const result = await client.updateMultiAssetCollateral({
+  portfolio_uuid: 'a1b2c3d4-0000-0000-0000-111111111111',
+  multi_asset_collateral_enabled: true,
+});
+
+console.log('Multi-asset collateral enabled:', result.multi_asset_collateral_enabled);
+```

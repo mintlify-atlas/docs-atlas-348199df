@@ -1,0 +1,143 @@
+---
+title: "Advanced Trade Convert API — Quote, Preview & Execute Trades"
+sidebarTitle: "Convert"
+description: "Use the Coinbase Advanced Trade Convert API to get conversion quotes, commit trades between assets, and retrieve the status of in-flight convert operations."
+---
+
+The Convert endpoints allow you to swap between assets directly — currently supporting USDC ↔ USD and EURC ↔ EUR conversions. The workflow is a two-step process: first call `submitConvertQuote()` to obtain a quoted rate and a `trade_id`, then call `commitConvertTrade()` to execute the conversion. Use `getConvertTrade()` at any point to check the status of an in-flight conversion.
+
+---
+
+## submitConvertQuote
+
+Create a convert quote for the specified source and target accounts and amount. This reserves a rate but does not execute the trade — call `commitConvertTrade()` to finalise it.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/convert/quote` |
+
+<ParamField body="from_account" type="string" required>
+  The UUID of the source account to convert from. Obtain account UUIDs via `getAccounts()`.
+</ParamField>
+
+<ParamField body="to_account" type="string" required>
+  The UUID of the target account to convert into.
+</ParamField>
+
+<ParamField body="amount" type="string" required>
+  The amount to convert from the source account, as a decimal string, e.g. `"100.00"`.
+</ParamField>
+
+<ParamField body="trade_incentive_metadata" type="object">
+  Optional promotional metadata object containing:
+  - `user_incentive_id` (string) — the incentive ID for promotional offers
+  - `code_val` (string) — promotional code value
+</ParamField>
+
+**Returns:** `Promise<any>` — a convert trade object including the `trade_id`, quoted rate, source and destination amounts, and expiry. Pass `trade_id` to `commitConvertTrade()` to execute.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your-api-key-name',
+  apiSecret: '-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n',
+});
+
+// Quote a conversion of 100 USDC → USD
+const quote = await client.submitConvertQuote({
+  from_account: 'usdc-account-uuid-here',
+  to_account:   'usd-account-uuid-here',
+  amount: '100.00',
+});
+
+console.log('Trade ID:', quote.trade?.id);
+console.log('Source amount:', quote.trade?.source?.value, quote.trade?.source?.currency);
+console.log('Target amount:', quote.trade?.target?.value, quote.trade?.target?.currency);
+```
+
+---
+
+## getConvertTrade
+
+Retrieve the current status and details of an existing convert trade by its trade ID.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/convert/trade/{trade_id}` |
+
+<ParamField path="trade_id" type="string" required>
+  The trade ID returned by `submitConvertQuote()`.
+</ParamField>
+
+<ParamField query="from_account" type="string" required>
+  The UUID of the source account associated with this trade.
+</ParamField>
+
+<ParamField query="to_account" type="string" required>
+  The UUID of the target account associated with this trade.
+</ParamField>
+
+**Returns:** `Promise<any>` — the full convert trade record with current status, quoted amounts, and timestamps.
+
+```typescript
+const trade = await client.getConvertTrade({
+  trade_id: 'trade-id-from-quote',
+  from_account: 'usdc-account-uuid-here',
+  to_account:   'usd-account-uuid-here',
+});
+
+console.log('Trade status:', trade.trade?.status);
+```
+
+---
+
+## commitConvertTrade
+
+Execute a previously quoted convert trade. The quote must not have expired.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/convert/trade/{trade_id}` |
+
+<ParamField path="trade_id" type="string" required>
+  The trade ID returned by `submitConvertQuote()`.
+</ParamField>
+
+<ParamField body="from_account" type="string" required>
+  The UUID of the source account. Must match the account used when creating the quote.
+</ParamField>
+
+<ParamField body="to_account" type="string" required>
+  The UUID of the target account. Must match the account used when creating the quote.
+</ParamField>
+
+**Returns:** `Promise<any>` — the completed convert trade record, including the final amounts exchanged and confirmation status.
+
+```typescript
+// Full quote-and-commit workflow
+const quote = await client.submitConvertQuote({
+  from_account: 'usdc-account-uuid-here',
+  to_account:   'usd-account-uuid-here',
+  amount: '250.00',
+});
+
+const tradeId = quote.trade?.id;
+
+// Commit the trade using the same accounts
+const result = await client.commitConvertTrade({
+  trade_id:     tradeId,
+  from_account: 'usdc-account-uuid-here',
+  to_account:   'usd-account-uuid-here',
+});
+
+console.log('Conversion complete:', result.trade?.status);
+console.log('Received:', result.trade?.target?.value, result.trade?.target?.currency);
+```
+
+<Note>
+  Convert is currently limited to **USDC ↔ USD** and **EURC ↔ EUR** pairs. Attempting to convert between other asset pairs will return an error.
+</Note>

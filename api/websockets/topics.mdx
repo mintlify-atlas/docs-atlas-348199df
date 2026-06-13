@@ -1,0 +1,556 @@
+---
+title: "WebSocket Channel & Topic Reference for All Coinbase APIs"
+sidebarTitle: "Topics"
+description: "Reference guide for all WebSocket channels available across Coinbase Advanced Trade, Exchange, International, and Prime — with subscription examples and payload shapes."
+---
+
+This page documents every available WebSocket channel across all four Coinbase real-time feeds. Use the `WsKey` column to know which `wsKey` to pass to `subscribe()`. Channels marked 🔒 require authentication — the SDK handles signing automatically when credentials are provided.
+
+---
+
+## Advanced Trade — Public Market Data
+
+**WsKey:** `WS_KEY_MAP.advTradeMarketData`  
+**URL:** `wss://advanced-trade-ws.coinbase.com`  
+**Auth:** Not required (public channels)
+
+### `heartbeats`
+
+Sends a heartbeat every second to confirm the connection is alive. Subscribe to prevent the connection from timing out.
+
+```typescript
+wsClient.subscribe('heartbeats', WS_KEY_MAP.advTradeMarketData);
+```
+
+**Payload shape:**
+```json
+{
+  "channel": "heartbeats",
+  "client_id": "...",
+  "timestamp": "2025-01-15T10:30:00Z",
+  "sequence_num": 1,
+  "events": [{ "current_time": "2025-01-15T10:30:00Z", "heartbeat_counter": 1 }]
+}
+```
+
+### `status`
+
+Broadcasts trading status updates for all products (new listings, delistings, trading halts).
+
+```typescript
+wsClient.subscribe('status', WS_KEY_MAP.advTradeMarketData);
+```
+
+### `ticker`
+
+Real-time best bid/ask, last trade price, and 24-hour statistics for the specified products. Fires on every price update.
+
+<ParamField body="product_ids" type="string[]" required>
+  List of product IDs to subscribe to.
+</ParamField>
+
+```typescript
+wsClient.subscribe(
+  { topic: 'ticker', payload: { product_ids: ['BTC-USD', 'ETH-USD'] } },
+  WS_KEY_MAP.advTradeMarketData
+);
+```
+
+**Payload shape (per event):**
+```json
+{
+  "channel": "ticker",
+  "events": [{
+    "type": "update",
+    "tickers": [{
+      "type": "ticker",
+      "product_id": "BTC-USD",
+      "price": "67450.12",
+      "volume_24_h": "12345.67",
+      "low_52_w": "25000.00",
+      "high_52_w": "73500.00",
+      "price_percent_chg_24_h": "2.34",
+      "best_bid": "67449.00",
+      "best_ask": "67451.00",
+      "best_bid_quantity": "0.05",
+      "best_ask_quantity": "0.03"
+    }]
+  }]
+}
+```
+
+### `ticker_batch`
+
+Batched ticker updates delivered once per second (instead of on every tick). Useful for lower-traffic use cases.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'ticker_batch', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.advTradeMarketData
+);
+```
+
+### `candles`
+
+Real-time candlestick updates. Delivers the current (forming) candle at the 1-minute granularity. Each event also includes the previous two completed candles.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'candles', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.advTradeMarketData
+);
+```
+
+**Payload shape (per candle):**
+```json
+{
+  "channel": "candles",
+  "events": [{
+    "type": "update",
+    "candles": [{
+      "start": "1705314600",
+      "high": "67500.00",
+      "low": "67400.00",
+      "open": "67420.00",
+      "close": "67480.00",
+      "volume": "1.234",
+      "product_id": "BTC-USD"
+    }]
+  }]
+}
+```
+
+### `market_trades`
+
+Real-time stream of executed trades (public market fills).
+
+```typescript
+wsClient.subscribe(
+  { topic: 'market_trades', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.advTradeMarketData
+);
+```
+
+**Payload shape:**
+```json
+{
+  "channel": "market_trades",
+  "events": [{
+    "type": "update",
+    "trades": [{
+      "trade_id": "12345",
+      "product_id": "BTC-USD",
+      "price": "67450.00",
+      "size": "0.001",
+      "side": "BUY",
+      "time": "2025-01-15T10:30:01Z"
+    }]
+  }]
+}
+```
+
+### `level2`
+
+Level 2 order book updates. Delivers a full snapshot on subscription, then incremental `bid`/`offer` updates.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'level2', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.advTradeMarketData
+);
+```
+
+**Payload shape:**
+```json
+{
+  "channel": "l2_data",
+  "events": [{
+    "type": "snapshot",
+    "product_id": "BTC-USD",
+    "updates": [
+      { "side": "bid", "event_time": "...", "price_level": "67449.00", "new_quantity": "0.5" },
+      { "side": "offer", "event_time": "...", "price_level": "67451.00", "new_quantity": "0.3" }
+    ]
+  }]
+}
+```
+
+---
+
+## Advanced Trade — Private User Data
+
+**WsKey:** `WS_KEY_MAP.advTradeUserData`  
+**URL:** `wss://advanced-trade-ws-user.coinbase.com`  
+**Auth:** 🔒 Required (JWT signed with CDP API key)
+
+### `user`
+
+Streams updates for your open orders, including fills, cancellations, and status changes.
+
+```typescript
+wsClient.subscribe('user', WS_KEY_MAP.advTradeUserData);
+```
+
+**Payload shape (order fill):**
+```json
+{
+  "channel": "user",
+  "events": [{
+    "type": "snapshot",
+    "orders": [{
+      "order_id": "...",
+      "client_order_id": "...",
+      "cumulative_quantity": "0.001",
+      "leaves_quantity": "0",
+      "avg_price": "67450.00",
+      "total_fees": "0.067",
+      "status": "FILLED",
+      "product_id": "BTC-USD",
+      "creation_time": "2025-01-15T10:29:55Z",
+      "order_side": "BUY",
+      "order_type": "LIMIT"
+    }]
+  }]
+}
+```
+
+### `futures_balance_summary`
+
+Streams updates to your Coinbase Financial Markets (futures) balance summary.
+
+```typescript
+wsClient.subscribe('futures_balance_summary', WS_KEY_MAP.advTradeUserData);
+```
+
+---
+
+## Exchange — Public Market Data
+
+**WsKey:** `WS_KEY_MAP.exchangeMarketData`  
+**URL:** `wss://ws-feed.exchange.coinbase.com`  
+**Sandbox:** `wss://ws-feed-public.sandbox.exchange.coinbase.com`  
+**Auth:** Not required
+
+<Note>
+  Exchange WebSocket subscriptions use a slightly different format. The `channels` field in subscription requests can contain either strings or objects with `name` and `product_ids`.
+</Note>
+
+### `heartbeat`
+
+Sends a heartbeat for specified products every second.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'heartbeat', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.exchangeMarketData
+);
+```
+
+**Payload shape:**
+```json
+{
+  "type": "heartbeat",
+  "sequence": 90,
+  "last_trade_id": 20,
+  "product_id": "BTC-USD",
+  "time": "2025-01-15T10:30:00.000000Z"
+}
+```
+
+### `status`
+
+Broadcasts the current trading status of all products on the Exchange.
+
+```typescript
+wsClient.subscribe('status', WS_KEY_MAP.exchangeMarketData);
+```
+
+### `ticker`
+
+Provides real-time best bid/ask and last trade price updates.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'ticker', payload: { product_ids: ['BTC-USD', 'ETH-USD'] } },
+  WS_KEY_MAP.exchangeMarketData
+);
+```
+
+**Payload shape:**
+```json
+{
+  "type": "ticker",
+  "trade_id": 20153558,
+  "sequence": 3262786978,
+  "time": "2025-01-15T10:30:00Z",
+  "product_id": "BTC-USD",
+  "price": "67450.01",
+  "side": "buy",
+  "last_size": "0.001",
+  "best_bid": "67449.00",
+  "best_ask": "67451.00"
+}
+```
+
+### `level2`
+
+Delivers the full order book as a snapshot then streams incremental updates.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'level2', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.exchangeMarketData
+);
+```
+
+### `matches`
+
+Streams all executed trades for the specified products.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'matches', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.exchangeMarketData
+);
+```
+
+**Payload shape:**
+```json
+{
+  "type": "match",
+  "trade_id": 10,
+  "sequence": 50,
+  "maker_order_id": "...",
+  "taker_order_id": "...",
+  "time": "2025-01-15T10:30:00.000000Z",
+  "product_id": "BTC-USD",
+  "size": "0.01",
+  "price": "67450.00",
+  "side": "sell"
+}
+```
+
+### `full`
+
+The full order book channel — streams every order lifecycle event (received, open, done, match, change). High-volume; use only when you need complete order book reconstruction.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'full', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.exchangeMarketData
+);
+```
+
+---
+
+## Exchange — Private Direct Market Data
+
+**WsKey:** `WS_KEY_MAP.exchangeDirectMarketData`  
+**URL:** `wss://ws-direct.exchange.coinbase.com`  
+**Sandbox:** `wss://ws-direct.sandbox.exchange.coinbase.com`  
+**Auth:** 🔒 Required (HMAC signed with `apiKey`, `apiSecret`, `apiPassphrase`)
+
+Provides direct server access to the Exchange WebSocket feed with lower latency. Supports the same channels as `exchangeMarketData`, plus private channels.
+
+### `user`
+
+Streams updates for your open orders, fills, and account changes.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'user', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.exchangeDirectMarketData
+);
+```
+
+### `heartbeat`
+
+Same as public heartbeat, but delivered via the authenticated direct feed.
+
+```typescript
+wsClient.subscribe(
+  { topic: 'heartbeat', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.exchangeDirectMarketData
+);
+```
+
+---
+
+## International Exchange
+
+**WsKey:** `WS_KEY_MAP.internationalMarketData`  
+**URL:** `wss://ws-md.international.coinbase.com`  
+**Sandbox:** `wss://ws-md.n5e2.coinbase.com`  
+**Auth:** 🔒 Required for all channels (HMAC signed with `apiKey`, `apiSecret`, `apiPassphrase`)
+
+<Note>
+  The International Exchange WebSocket feed always requires authentication — even for market data channels. Subscribe using `SUBSCRIBE` (uppercase) type which is handled automatically by the SDK.
+</Note>
+
+### `INSTRUMENTS`
+
+Streams real-time instrument (perpetual futures / spot) market data including quotes, best bid/ask, and funding rates.
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'INSTRUMENTS',
+    payload: { product_ids: ['BTC-PERP'] },
+  },
+  WS_KEY_MAP.internationalMarketData
+);
+```
+
+### `ORDERS`
+
+Streams updates to your open orders on the International Exchange.
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'ORDERS',
+    payload: { product_ids: ['BTC-PERP'] },
+  },
+  WS_KEY_MAP.internationalMarketData
+);
+```
+
+### `POSITIONS`
+
+Streams real-time position updates for your portfolio.
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'POSITIONS',
+    payload: { portfolio: 'your-portfolio-uuid' },
+  },
+  WS_KEY_MAP.internationalMarketData
+);
+```
+
+### `FUNDING`
+
+Streams funding rate updates for perpetual futures instruments.
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'FUNDING',
+    payload: { product_ids: ['BTC-PERP'] },
+  },
+  WS_KEY_MAP.internationalMarketData
+);
+```
+
+### `RISK`
+
+Streams portfolio-level risk metrics (margin, collateral, etc.).
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'RISK',
+    payload: { portfolio: 'your-portfolio-uuid' },
+  },
+  WS_KEY_MAP.internationalMarketData
+);
+```
+
+---
+
+## Prime
+
+**WsKey:** `WS_KEY_MAP.primeMarketData`  
+**URL:** `wss://ws-feed.prime.coinbase.com`  
+**Auth:** 🔒 Required for all channels
+
+<Note>
+  Prime WebSocket subscriptions require `svcAccountId` and `portfolio_id` in the payload. These are included in the signed subscription request automatically by the SDK when provided.
+</Note>
+
+### `l2_data`
+
+Level 2 order book updates for a Prime trading product.
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'l2_data',
+    payload: {
+      product_ids: ['BTC-USD'],
+      portfolio_id: 'your-portfolio-uuid',
+      svcAccountId: 'your-svc-account-id',
+    },
+  },
+  WS_KEY_MAP.primeMarketData
+);
+```
+
+### `market_trades`
+
+Real-time stream of executed trades for a product.
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'market_trades',
+    payload: {
+      product_ids: ['BTC-USD'],
+      portfolio_id: 'your-portfolio-uuid',
+      svcAccountId: 'your-svc-account-id',
+    },
+  },
+  WS_KEY_MAP.primeMarketData
+);
+```
+
+### `order`
+
+Streams real-time updates for your open orders on Prime.
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'order',
+    payload: {
+      product_ids: ['BTC-USD'],
+      portfolio_id: 'your-portfolio-uuid',
+      svcAccountId: 'your-svc-account-id',
+    },
+  },
+  WS_KEY_MAP.primeMarketData
+);
+```
+
+---
+
+## Quick Reference Table
+
+| WsKey | Channel | Auth | Description |
+|-------|---------|:----:|-------------|
+| `advTradeMarketData` | `heartbeats` | — | Connection keep-alive |
+| `advTradeMarketData` | `status` | — | Product listing/trading status changes |
+| `advTradeMarketData` | `ticker` | — | Real-time best bid/ask and last price |
+| `advTradeMarketData` | `ticker_batch` | — | Batched ticker (once per second) |
+| `advTradeMarketData` | `candles` | — | 1-minute candlestick updates |
+| `advTradeMarketData` | `market_trades` | — | Public trade executions |
+| `advTradeMarketData` | `level2` | — | Full order book + incremental updates |
+| `advTradeUserData` | `user` | 🔒 | My orders, fills, cancellations |
+| `advTradeUserData` | `futures_balance_summary` | 🔒 | Futures balance updates |
+| `exchangeMarketData` | `heartbeat` | — | Per-product heartbeat |
+| `exchangeMarketData` | `status` | — | Product status |
+| `exchangeMarketData` | `ticker` | — | Best bid/ask, last trade |
+| `exchangeMarketData` | `level2` | — | Order book snapshot + updates |
+| `exchangeMarketData` | `matches` | — | Public trade executions |
+| `exchangeMarketData` | `full` | — | Full order lifecycle feed |
+| `exchangeDirectMarketData` | `user` | 🔒 | My orders + account updates |
+| `exchangeDirectMarketData` | `heartbeat` | 🔒 | Heartbeat on direct feed |
+| `internationalMarketData` | `INSTRUMENTS` | 🔒 | Quote + funding data |
+| `internationalMarketData` | `ORDERS` | 🔒 | My open orders |
+| `internationalMarketData` | `POSITIONS` | 🔒 | Portfolio positions |
+| `internationalMarketData` | `FUNDING` | 🔒 | Funding rate updates |
+| `internationalMarketData` | `RISK` | 🔒 | Portfolio risk metrics |
+| `primeMarketData` | `l2_data` | 🔒 | Level 2 order book |
+| `primeMarketData` | `market_trades` | 🔒 | Trade executions |
+| `primeMarketData` | `order` | 🔒 | My order updates |

@@ -1,0 +1,305 @@
+---
+title: "Advanced Trade WebSocket Channels & Subscriptions"
+sidebarTitle: "Advanced Trade"
+description: "Subscribe to Coinbase Advanced Trade WebSocket channels — ticker, candles, level2 order books, market trades, heartbeats, and private user order updates."
+---
+
+The Advanced Trade WebSocket API exposes two distinct feeds, each with its own WsKey. Public channels stream market data with no credentials; private channels stream per-user order and balance events and require JWT authentication, which the SDK handles automatically.
+
+## WsKey values
+
+| WsKey | Auth required | URL |
+|---|---|---|
+| `advTradeMarketData` | No | `wss://advanced-trade-ws.coinbase.com` |
+| `advTradeUserData` | Yes | `wss://advanced-trade-ws-user.coinbase.com` |
+
+<Tip>
+  Use `product_ids` in the `payload` object to filter a channel to specific instruments. Omitting `product_ids` subscribes to all products for channels that support it.
+</Tip>
+
+## Instantiation
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { WebsocketClient, WsTopicRequest } from 'coinbase-api';
+
+    // Public only — no credentials needed
+    const publicClient = new WebsocketClient();
+
+    // Private — provide your CDP API key name and EC private key
+    const privateClient = new WebsocketClient({
+      apiKey: process.env.API_KEY_NAME,
+      apiSecret: process.env.API_PRIVATE_KEY,
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const { WebsocketClient } = require('coinbase-api');
+
+    // Public only — no credentials needed
+    const publicClient = new WebsocketClient();
+
+    // Private — provide your CDP API key name and EC private key
+    const privateClient = new WebsocketClient({
+      apiKey: process.env.API_KEY_NAME,
+      apiSecret: process.env.API_PRIVATE_KEY,
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Public channels
+
+Use WsKey `advTradeMarketData` for all public channels. No API credentials required.
+
+### heartbeats
+
+Sends a heartbeat message every second to confirm the connection is alive.
+
+```typescript
+client.subscribe('heartbeats', 'advTradeMarketData');
+```
+
+### status
+
+Provides trading status for one or more products — whether they are online, offline, or in maintenance.
+
+```typescript
+client.subscribe(
+  {
+    topic: 'status',
+    payload: {
+      product_ids: ['BTC-USD', 'ETH-USD'],
+    },
+  },
+  'advTradeMarketData',
+);
+```
+
+### ticker
+
+Real-time best bid/ask and last trade price updates.
+
+```typescript
+client.subscribe(
+  {
+    topic: 'ticker',
+    payload: {
+      product_ids: ['BTC-USD', 'ETH-USD'],
+    },
+  },
+  'advTradeMarketData',
+);
+```
+
+### ticker_batch
+
+Batched ticker updates — lower frequency than `ticker`, suitable for less latency-sensitive use cases.
+
+```typescript
+client.subscribe(
+  {
+    topic: 'ticker_batch',
+    payload: {
+      product_ids: ['BTC-USD', 'ETH-USD'],
+    },
+  },
+  'advTradeMarketData',
+);
+```
+
+### candles
+
+OHLCV candlestick data for a product. Each message is a single completed or in-progress candle.
+
+```typescript
+client.subscribe(
+  {
+    topic: 'candles',
+    payload: {
+      product_ids: ['ETH-USD'],
+    },
+  },
+  'advTradeMarketData',
+);
+```
+
+### market_trades
+
+Individual trade executions as they occur on the exchange.
+
+```typescript
+client.subscribe(
+  {
+    topic: 'market_trades',
+    payload: {
+      product_ids: ['ETH-USD', 'BTC-USD'],
+    },
+  },
+  'advTradeMarketData',
+);
+```
+
+### level2
+
+Full order book snapshot followed by incremental updates. Maintains a local copy of the best bids and asks.
+
+```typescript
+client.subscribe(
+  {
+    topic: 'level2',
+    payload: {
+      product_ids: ['BTC-USD', 'ETH-USD'],
+    },
+  },
+  'advTradeMarketData',
+);
+```
+
+## Private channels
+
+Use WsKey `advTradeUserData` for private channels. The SDK attaches a signed JWT to every subscribe request automatically — no manual signing required.
+
+### user
+
+Streams updates for the authenticated user's open orders — fills, state changes, and cancellations.
+
+```typescript
+client.subscribe('user', 'advTradeUserData');
+```
+
+### futures_balance_summary
+
+Provides real-time futures account balance and margin information.
+
+```typescript
+client.subscribe('futures_balance_summary', 'advTradeUserData');
+```
+
+## Full public example
+
+The example below is adapted directly from the SDK source. It subscribes to every major public channel in a single `subscribe()` call using the array form.
+
+```typescript
+import { WebsocketClient, WsTopicRequest } from 'coinbase-api';
+
+const client = new WebsocketClient();
+
+client.on('open', (data) => {
+  console.log('open:', data?.wsKey);
+});
+
+client.on('update', (data) => {
+  console.info(new Date(), 'data received:', JSON.stringify(data));
+});
+
+client.on('reconnect', (data) => {
+  console.log('reconnect:', data);
+});
+
+client.on('reconnected', (data) => {
+  console.log('reconnected:', data);
+});
+
+client.on('close', (data) => {
+  console.error('close:', data);
+});
+
+client.on('response', (data) => {
+  console.info('response:', JSON.stringify(data, null, 2));
+});
+
+client.on('exception', (data) => {
+  console.error('exception:', data);
+});
+
+// Subscribe to multiple public channels at once
+client.subscribe(
+  [
+    { topic: 'heartbeats' },
+    { topic: 'candles',       payload: { product_ids: ['ETH-USD'] } },
+    { topic: 'market_trades', payload: { product_ids: ['ETH-USD', 'BTC-USD'] } },
+    { topic: 'status',        payload: { product_ids: ['ETH-USD', 'BTC-USD'] } },
+    { topic: 'ticker',        payload: { product_ids: ['ETH-USD', 'BTC-USD'] } },
+    { topic: 'ticker_batch',  payload: { product_ids: ['ETH-USD', 'BTC-USD'] } },
+    { topic: 'level2',        payload: { product_ids: ['ETH-USD', 'BTC-USD'] } },
+  ],
+  'advTradeMarketData',
+);
+```
+
+## Full private example
+
+```typescript
+import { WebsocketClient } from 'coinbase-api';
+
+const client = new WebsocketClient({
+  // ECDSA key (includes -----BEGIN EC PRIVATE KEY----- header)
+  apiKey: process.env.API_KEY_NAME,
+  apiSecret: process.env.API_PRIVATE_KEY,
+
+  // ED25519 keys are also supported:
+  // apiKey: 'your-api-key-id',
+  // apiSecret: 'yourExampleApiSecretEd25519Version==',
+});
+
+client.on('open',        (data) => console.log('open:',      data?.wsKey));
+client.on('update',      (data) => console.info('data:',     JSON.stringify(data)));
+client.on('reconnect',   (data) => console.log('reconnect:', data));
+client.on('reconnected', (data) => console.log('reconnected:', data));
+client.on('close',       (data) => console.error('close:',   data));
+client.on('response',    (data) => console.info('response:', JSON.stringify(data, null, 2)));
+client.on('exception',   (data) => console.error('exception:', data));
+
+// Subscribe to the user order feed (JWT is attached automatically)
+client.subscribe('user', 'advTradeUserData');
+
+// Subscribe to futures balance summary
+client.subscribe('futures_balance_summary', 'advTradeUserData');
+```
+
+## Handling update events
+
+Each `update` event payload includes a `channel` field that identifies which channel the message belongs to, plus a `wsKey` so you can distinguish between connections if you share a single listener.
+
+```typescript
+client.on('update', (data) => {
+  switch (data.channel) {
+    case 'ticker':
+      // data.events[].tickers[]
+      break;
+    case 'l2_data':
+      // data.events[].updates[] — order book deltas
+      break;
+    case 'market_trades':
+      // data.events[].trades[]
+      break;
+    case 'user':
+      // data.events[].orders[]
+      break;
+    default:
+      console.log('Unhandled channel:', data.channel, data);
+  }
+});
+```
+
+<Note>
+  For fully typed request objects, import `WsAdvTradeRequestOperation` from `coinbase-api`. This gives you IDE autocompletion for every channel name and its accepted payload fields.
+</Note>
+
+## Unsubscribing
+
+Pass the same topic shape you used to subscribe:
+
+```typescript
+// Unsubscribe a single string topic
+client.unsubscribe('heartbeats', 'advTradeMarketData');
+
+// Unsubscribe a topic that was subscribed with a payload
+client.unsubscribe(
+  { topic: 'ticker', payload: { product_ids: ['BTC-USD', 'ETH-USD'] } },
+  'advTradeMarketData',
+);
+```

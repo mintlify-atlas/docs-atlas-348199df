@@ -1,0 +1,264 @@
+---
+title: "Handle Errors and Exceptions in coinbase-api"
+sidebarTitle: "Error Handling"
+description: "Learn how coinbase-api surfaces REST API errors and WebSocket exceptions, and how to write robust error-handling code for both synchronous and async patterns."
+---
+
+Reliable trading applications must handle both REST API failures and WebSocket disconnections gracefully. The `coinbase-api` SDK provides a consistent error model across all clients, with structured exception objects, configurable parsing behaviour, and automatic reconnection for WebSocket connections.
+
+## REST API Error Handling
+
+Every REST method in the SDK returns a `Promise`. Wrap your `await` calls in a `try/catch` block to intercept failures cleanly.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your_api_key_name',
+  apiSecret: 'your_api_private_key',
+});
+
+async function fetchAccounts() {
+  try {
+    const accounts = await client.getAccounts();
+    console.log('Accounts:', accounts);
+  } catch (e) {
+    console.error('Exception: ', JSON.stringify(e));
+  }
+}
+
+fetchAccounts();
+```
+
+<Note>
+  Always use `JSON.stringify(e)` when logging SDK errors. The error object is a structured plain object — not an `Error` instance — so `console.error(e)` alone may not surface all fields.
+</Note>
+
+### The Error Object Shape
+
+When a REST request fails, the SDK throws a structured object with the following fields:
+
+```typescript
+{
+  code: number;            // HTTP status code (e.g. 401, 400, 429)
+  message: string;         // HTTP status text (e.g. "Unauthorized")
+  body: any;               // Parsed response body from Coinbase (contains their error detail)
+  headers: object;         // Response headers
+  requestOptions: object;  // Sanitised request config (credentials are omitted)
+  requestParams: object;   // The params that triggered the error
+}
+```
+
+For example, an unauthorised request returns:
+
+```json
+{
+  "code": 401,
+  "message": "Unauthorized",
+  "body": {
+    "error": "UNAUTHORIZED",
+    "message": "Invalid API key",
+    "preview_failure_reason": ""
+  },
+  "headers": { ... },
+  "requestOptions": {
+    "apiKey": "omittedFromError",
+    "apiSecret": "omittedFromError"
+  }
+}
+```
+
+<Tip>
+  Credentials are automatically scrubbed from the `requestOptions` field in every thrown error, so it is safe to log the full exception object.
+</Tip>
+
+### The `parseExceptions` Option
+
+By default (`parseExceptions: true`), the SDK intercepts Axios errors and re-throws them as the structured object above. Set `parseExceptions: false` to receive the raw Axios error instead — useful if you have existing Axios error-handling infrastructure.
+
+```typescript
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your_api_key_name',
+  apiSecret: 'your_api_private_key',
+  parseExceptions: false, // receive raw Axios errors
+});
+```
+
+### The `strictParamValidation` Option
+
+When `strictParamValidation: true` is set, the SDK throws immediately if any parameter in a request is `undefined`. This is useful during development to catch missing required fields before they reach the API.
+
+```typescript
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your_api_key_name',
+  apiSecret: 'your_api_private_key',
+  strictParamValidation: true, // throw on undefined params
+});
+```
+
+<Note>
+  `strictParamValidation` defaults to `false`. Enable it during development and consider disabling it in production to avoid unexpected throws from optional parameters.
+</Note>
+
+## WebSocket Error Handling
+
+The `WebsocketClient` is event-driven. Listen to the `exception` event to handle errors, and the `close` event to detect dropped connections.
+
+```typescript
+import { WebsocketClient } from 'coinbase-api';
+
+const ws = new WebsocketClient({
+  apiKey: 'your_api_key_name',
+  apiSecret: 'your_api_private_key',
+});
+
+// WebSocket error occurred
+ws.on('exception', (data) => {
+  console.error('WebSocket exception: ', data);
+});
+
+// Connection closed unexpectedly
+ws.on('close', (data) => {
+  console.error('WebSocket closed: ', data?.wsKey);
+  // If unexpected, the SDK will automatically attempt to reconnect
+});
+```
+
+### Automatic Reconnection
+
+When a WebSocket connection drops unexpectedly, the SDK handles the full reconnection cycle automatically — you do not need to resubscribe manually. The lifecycle fires these events in order:
+
+```typescript
+ws.on('reconnect', (data) => {
+  // Reconnect attempt is starting
+  console.log('Attempting to reconnect...', data?.wsKey);
+});
+
+ws.on('reconnected', (data) => {
+  // Successfully restored — all subscriptions are already resubscribed
+  console.log('Reconnected successfully:', data?.wsKey);
+});
+```
+
+<Tip>
+  Topic subscriptions are cached inside the SDK. When a connection is restored after `reconnect`, all previously subscribed topics are resubscribed automatically. You do not need to call `subscribe()` again.
+</Tip>
+
+## Complete Example: REST + WebSocket Error Handling
+
+```typescript
+import { CBAdvancedTradeClient, WebsocketClient } from 'coinbase-api';
+
+// --- REST client ---
+const restClient = new CBAdvancedTradeClient({
+  apiKey: 'your_api_key_name',
+  apiSecret: 'your_api_private_key',
+  strictParamValidation: false,
+  parseExceptions: true,
+});
+
+async function placeOrder() {
+  try {
+    const result = await restClient.submitOrder({
+      client_order_id: restClient.generateNewOrderId(),
+      product_id: 'BTC-USD',
+      side: 'BUY',
+      order_configuration: {
+        market_market_ioc: { quote_size: '10' },
+      },
+    });
+    console.log('Order placed:', result);
+  } catch (e: any) {
+    // Log the full structured error
+    console.error('REST error:', JSON.stringify(e));
+
+    // Inspect specific fields
+    if (e?.code === 401) {
+      console.error('Authentication failed — check your API key and secret.');
+    } else if (e?.code === 429) {
+      console.error('Rate limit hit — slow down request frequency.');
+    } else if (e?.code === 400) {
+      console.error('Bad request — check params:', e?.body);
+    }
+  }
+}
+
+// --- WebSocket client ---
+const wsClient = new WebsocketClient({
+  apiKey: 'your_api_key_name',
+  apiSecret: 'your_api_private_key',
+});
+
+wsClient.on('open', ({ wsKey }) => console.log('WS open:', wsKey));
+wsClient.on('update', (data) => console.log('WS data:', JSON.stringify(data)));
+
+wsClient.on('exception', (data) => {
+  console.error('WS exception:', JSON.stringify(data));
+});
+
+wsClient.on('close', ({ wsKey }) => {
+  console.warn('WS closed unexpectedly:', wsKey);
+  // No action needed — SDK reconnects automatically
+});
+
+wsClient.on('reconnect', ({ wsKey }) => {
+  console.log('WS reconnecting:', wsKey);
+});
+
+wsClient.on('reconnected', ({ wsKey }) => {
+  console.log('WS reconnected — subscriptions restored:', wsKey);
+});
+
+wsClient.subscribe('heartbeats', 'advTradeMarketData');
+placeOrder();
+```
+
+## Common Error Scenarios
+
+<AccordionGroup>
+  <Accordion title="401 Unauthorized">
+    **Cause:** The API key is invalid, expired, or does not have the required permissions for the endpoint.
+
+    **Resolution:**
+    - Verify `apiKey` is your full API key name (e.g. `organizations/xxx/apiKeys/yyy`).
+    - Ensure `apiSecret` includes the complete PEM block with `-----BEGIN EC PRIVATE KEY-----` headers.
+    - Check that the key has the correct permissions enabled in the Coinbase API Key Management console.
+    - For WebSockets, a 401 appears as `'Unexpected server response: 401'` in the `exception` event.
+  </Accordion>
+
+  <Accordion title="400 Bad Request">
+    **Cause:** The request body or query parameters are malformed or contain invalid values.
+
+    **Resolution:**
+    - Check `e.body` for Coinbase's detailed error message — it often describes which field is invalid.
+    - Enable `strictParamValidation: true` during development to catch `undefined` parameters early.
+    - Compare your parameter names against the TypeScript type definitions in the SDK.
+  </Accordion>
+
+  <Accordion title="429 Rate Limiting">
+    **Cause:** You have exceeded Coinbase's rate limits for the endpoint.
+
+    **Resolution:**
+    - Inspect `e.headers` for `Retry-After` or `X-RateLimit-Reset` values.
+    - Implement exponential back-off between retries.
+    - Consider batching requests where the API supports it.
+    - Coinbase rate limits are per-IP and per-key; check the [Coinbase API docs](https://docs.cdp.coinbase.com/advanced-trade/docs/rest-api-rate-limits) for per-endpoint limits.
+  </Accordion>
+
+  <Accordion title="No Response Received">
+    **Cause:** The request was sent but no response arrived — typically a network timeout or connectivity issue.
+
+    **Resolution:**
+    - The SDK throws `e` (the original Axios error) when `e.response` is absent but `e.request` is present.
+    - Increase the default `timeout` via `networkOptions` if your network is slow.
+    - Enable `keepAlive: true` in `RestClientOptions` to reuse TCP connections and reduce connection overhead.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+- **Always wrap `await` calls in `try/catch`** — promises that reject without a handler cause unhandled rejection warnings in Node.js 15+ and crash in some runtimes.
+- **Log with `JSON.stringify(e)`** — the error object is a plain object; string coercion produces `[object Object]`.
+- **Check `e.code` before retrying** — only retry on transient errors (5xx, 429). Do not retry 401 or 400 without fixing the underlying issue.
+- **Listen to `exception` on every `WebsocketClient`** — unhandled `exception` events will not crash the process but you will miss important diagnostic information.
+- **Do not manually resubscribe after a reconnect** — the SDK handles this automatically via its internal topic cache.

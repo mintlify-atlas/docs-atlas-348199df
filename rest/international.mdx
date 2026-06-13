@@ -1,0 +1,313 @@
+---
+title: "CBInternationalClient: Institutional Cross-Border Trading"
+sidebarTitle: "International"
+description: "CBInternationalClient accesses the Coinbase International Exchange API for institutional trading, portfolio margin, instruments, and order management."
+---
+
+`CBInternationalClient` connects to the [Coinbase International Exchange API](https://docs.cdp.coinbase.com/intx/docs/welcome), a venue designed for institutional cross-border trading. It provides access to perpetual futures instruments, portfolio-margin accounts, multi-portfolio management, and an extensive set of position and transfer operations.
+
+<Note>
+  The International Exchange API uses **API key + secret + passphrase** authentication — the same credential format as `CBExchangeClient`, not JWT.
+</Note>
+
+## Installation
+
+```bash
+npm install coinbase-api
+```
+
+## Instantiation
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { CBInternationalClient } from 'coinbase-api';
+
+    const client = new CBInternationalClient({
+      apiKey: 'your_api_key',
+      apiSecret: 'your_api_secret',
+      apiPassphrase: 'your_api_passphrase',
+    });
+
+    // Use the sandbox environment:
+    const sandboxClient = new CBInternationalClient({
+      apiKey: 'sandbox_key',
+      apiSecret: 'sandbox_secret',
+      apiPassphrase: 'sandbox_passphrase',
+      useSandbox: true,
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const { CBInternationalClient } = require('coinbase-api');
+
+    const client = new CBInternationalClient({
+      apiKey: 'your_api_key',
+      apiSecret: 'your_api_secret',
+      apiPassphrase: 'your_api_passphrase',
+    });
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  The sandbox for the International Exchange is available at `https://api-n5e1.coinbase.com`. Enable it by passing `useSandbox: true`.
+</Tip>
+
+---
+
+## Assets
+
+Retrieve the full list of supported assets and network information for each one. These endpoints are **public** — no authentication required.
+
+| Method | Description |
+|---|---|
+| `getAssets()` | List all supported assets |
+| `getAssetDetails(params)` | Get details for a specific asset |
+| `getSupportedNetworksPerAsset(params)` | List networks available for an asset |
+
+```typescript
+// No auth required
+const assets = await client.getAssets();
+
+const btcDetails = await client.getAssetDetails({ asset: 'BTC' });
+
+const networks = await client.getSupportedNetworksPerAsset({ asset: 'ETH' });
+```
+
+---
+
+## Index
+
+Query index composition and historical price data for Coinbase's published indices. These endpoints are **public**.
+
+| Method | Description |
+|---|---|
+| `getIndexComposition(params)` | Get the latest index composition and weights |
+| `getIndexCompositionHistory(params)` | Get historical composition records |
+| `getIndexPrice(params)` | Get the current index price |
+| `getIndexCandles(params)` | Get daily OHLC index price history |
+
+```typescript
+const composition = await client.getIndexComposition({ index: 'CI5' });
+const price = await client.getIndexPrice({ index: 'CI5' });
+
+const candles = await client.getIndexCandles({
+  index: 'CI5',
+  granularity: 'ONE_DAY',
+  start: '2024-01-01',
+  end: '2024-01-31',
+});
+```
+
+---
+
+## Instruments
+
+Instruments are the tradeable products on the International Exchange (e.g. perpetual futures). Most instrument endpoints are **public**.
+
+| Method | Description |
+|---|---|
+| `getInstruments()` | List all available instruments |
+| `getInstrumentDetails(params)` | Get market info for a specific instrument |
+| `getQuotePerInstrument(params)` | Get the current bid/ask quote |
+| `getDailyTradingVolumes(params)` | Get per-instrument daily trading volumes |
+| `getAggregatedCandlesData(params)` | Get OHLCV candles for an instrument |
+| `getHistoricalFundingRates(params)` | Get historical funding rates |
+
+<CodeGroup>
+  ```typescript List instruments & quotes
+  const instruments = await client.getInstruments();
+
+  const quote = await client.getQuotePerInstrument({
+    instrument: 'BTC-PERP',
+  });
+  ```
+
+  ```typescript Get candles
+  const candles = await client.getAggregatedCandlesData({
+    instrument: 'BTC-PERP',
+    granularity: 'ONE_HOUR',
+    start: '1699920000',
+    end: '1700006400',
+  });
+  ```
+
+  ```typescript Historical funding rates
+  const funding = await client.getHistoricalFundingRates({
+    instrument: 'ETH-PERP',
+    result_limit: 100,
+  });
+  ```
+
+  ```typescript Daily volumes
+  const volumes = await client.getDailyTradingVolumes({
+    instruments: 'BTC-PERP,ETH-PERP',
+  });
+  ```
+</CodeGroup>
+
+---
+
+## Orders & Positions
+
+All order and fill endpoints require authentication.
+
+| Method | Description |
+|---|---|
+| `submitOrder(params)` | Create a new order |
+| `getOpenOrders(params?)` | List active orders on the book |
+| `cancelOrders(params)` | Cancel all orders matching criteria |
+| `updateOpenOrder(params)` | Modify an open order |
+| `getOrderDetails(params)` | Get a single order (active or historical) |
+| `cancelOrder(params)` | Cancel a single order |
+| `getPortfolioFills(params)` | List fills for a portfolio |
+| `getFillsByPortfolios(params?)` | List fills across multiple portfolios |
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    // Place a limit order
+    const order = await client.submitOrder({
+      portfolio: 'your-portfolio-id',
+      side: 'BUY',
+      instrument: 'BTC-PERP',
+      type: 'LIMIT',
+      price: '30000',
+      size: '1',
+      client_order_id: 'my-order-001',
+    });
+
+    // List open orders
+    const open = await client.getOpenOrders({
+      portfolio: 'your-portfolio-id',
+      instrument: 'BTC-PERP',
+    });
+
+    // Cancel a specific order
+    await client.cancelOrder({
+      id: order.order_id,
+      portfolio: 'your-portfolio-id',
+    });
+
+    // Get fills
+    const fills = await client.getPortfolioFills({
+      portfolio: 'your-portfolio-id',
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    // Place a limit order
+    const order = await client.submitOrder({
+      portfolio: 'your-portfolio-id',
+      side: 'BUY',
+      instrument: 'BTC-PERP',
+      type: 'LIMIT',
+      price: '30000',
+      size: '1',
+    });
+
+    // List open orders
+    const open = await client.getOpenOrders({
+      portfolio: 'your-portfolio-id',
+    });
+
+    // Cancel all orders on an instrument
+    await client.cancelOrders({
+      portfolio: 'your-portfolio-id',
+      instrument: 'BTC-PERP',
+    });
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Portfolio Management
+
+The International Exchange is portfolio-margin based. All positions, balances, and fills are scoped to portfolios.
+
+| Method | Description |
+|---|---|
+| `getUserPortfolios()` | List all portfolios |
+| `createPortfolio(params)` | Create a new portfolio (max 20) |
+| `getUserPortfolio(params)` | Get a specific portfolio |
+| `getPortfolioDetails(params)` | Get summary, positions, and balances |
+| `getPortfolioSummary(params)` | High-level portfolio overview |
+| `getPortfolioBalances(params)` | List all balances in a portfolio |
+| `getPortfolioPositions(params)` | List all open positions |
+| `updatePortfolioParameters(params)` | Update portfolio parameters |
+| `transferFundsBetweenPortfolios(params)` | Transfer assets between portfolios |
+| `transferPositionsBetweenPortfolios(params)` | Transfer an existing position |
+
+```typescript
+const portfolios = await client.getUserPortfolios();
+
+const details = await client.getPortfolioDetails({
+  portfolio: 'your-portfolio-id',
+});
+
+// Transfer 1 BTC from one portfolio to another
+await client.transferFundsBetweenPortfolios({
+  from: 'source-portfolio-id',
+  to: 'target-portfolio-id',
+  asset: 'BTC',
+  amount: '1',
+});
+```
+
+---
+
+## Transfers
+
+Deposit to and withdraw from your International Exchange portfolios.
+
+| Method | Description |
+|---|---|
+| `getMatchingTransfers(params?)` | List transfers matching criteria |
+| `getTransfer(params)` | Get a specific transfer |
+| `withdrawToCryptoAddress(params)` | Withdraw to an external crypto address |
+| `createCryptoAddress(params)` | Generate a deposit address |
+| `createCounterpartyId(params)` | Create a Coinbase network counterparty ID |
+| `withdrawToCounterpartyId(params)` | Withdraw within the Coinbase network |
+
+```typescript
+// Generate a deposit address for BTC on the Bitcoin network
+const address = await client.createCryptoAddress({
+  portfolio: 'your-portfolio-id',
+  asset: 'BTC',
+  network_arn_id: 'networks/bitcoin-mainnet/assets/313ef8a9-ae5a-5f2f-8a56-33c906b98b43',
+});
+
+// Withdraw to external address
+await client.withdrawToCryptoAddress({
+  portfolio: 'your-portfolio-id',
+  asset: 'USDC',
+  amount: '500',
+  address: '0xYourEthAddress',
+});
+```
+
+---
+
+## Fee Rate Tiers
+
+```typescript
+// Get Perpetual Future and Spot fee rate tiers for the authenticated user
+const feeRates = await client.getFeeRateTiers();
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Prime Client" icon="lock" href="/rest/prime">
+    Institutional custody, wallets, and order management
+  </Card>
+  <Card title="Exchange Client" icon="building-columns" href="/rest/exchange">
+    Professional trading with profiles and conversions
+  </Card>
+</CardGroup>

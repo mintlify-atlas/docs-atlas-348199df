@@ -1,0 +1,184 @@
+---
+title: "Customise Logging in the coinbase-api SDK"
+sidebarTitle: "Logging"
+description: "Override the SDK's DefaultLogger to control trace, info, and error output — filter noisy ping/pong messages or redirect logs to your own logging system."
+---
+
+The `coinbase-api` SDK ships with a built-in `DefaultLogger` that writes to the console at three severity levels: `trace`, `info`, and `error`. You can override any or all of these levels to filter noisy output, integrate with a structured logging library, or silence the SDK entirely in test environments.
+
+## The DefaultLogger
+
+The built-in logger is exported from the package as `DefaultLogger`. Its default behaviour is:
+
+- **`trace`** — silent by default (commented out). Used for verbose internal events like ping/pong frames and upstream WebSocket messages.
+- **`info`** — writes to `console.info`. Used for connection lifecycle events (open, reconnect, close).
+- **`error`** — writes to `console.error`. Used for unexpected failures and parsing errors.
+
+```typescript
+// The built-in DefaultLogger (simplified)
+export const DefaultLogger = {
+  trace: (..._params: any): void => {
+    // silent by default
+  },
+  info: (...params: any): void => {
+    console.info(params);
+  },
+  error: (...params: any): void => {
+    console.error(params);
+  },
+};
+```
+
+## Passing a Custom Logger
+
+Pass a custom logger as the **second argument** to `WebsocketClient` (or any REST client constructor). The logger must implement `trace`, `info`, and `error` methods.
+
+```typescript
+import { WebsocketClient, DefaultLogger } from 'coinbase-api';
+
+const myLogger = {
+  trace: (...params: any) => console.log('[TRACE]', ...params),
+  info:  (...params: any) => console.info('[INFO]', ...params),
+  error: (...params: any) => console.error('[ERROR]', ...params),
+};
+
+const ws = new WebsocketClient(
+  {
+    apiKey: 'your_api_key_name',
+    apiSecret: 'your_api_private_key',
+  },
+  myLogger, // <-- second argument
+);
+```
+
+<Note>
+  The logger is the second argument to `WebsocketClient`. REST clients (`CBAdvancedTradeClient`, `CBExchangeClient`, etc.) do not currently accept a custom logger — logging customisation is primarily relevant for the WebSocket client, which generates high-frequency trace events.
+</Note>
+
+## Filtering Noisy Ping/Pong Messages
+
+When you enable trace-level logging, you will see frequent messages from the SDK's internal heartbeat mechanism. Use a spread of `DefaultLogger` and override only the `trace` function to selectively filter these out:
+
+```typescript
+import { WebsocketClient, DefaultLogger } from 'coinbase-api';
+
+const logger = {
+  // Inherit info and error from DefaultLogger unchanged
+  ...DefaultLogger,
+  // Override only trace to filter out heartbeat noise
+  trace: (...params: any[]) => {
+    if (
+      [
+        'Sending ping',
+        'Sending upstream ws message: ',
+        'Received pong, clearing pong timer',
+        'Received ping, sending pong frame',
+      ].includes(params[0])
+    ) {
+      return; // suppress these messages
+    }
+    console.log('trace', params);
+  },
+};
+
+const ws = new WebsocketClient(
+  {
+    apiKey: 'your_api_key_name',
+    apiSecret: 'your_api_private_key',
+  },
+  logger,
+);
+```
+
+This pattern lets you see all other trace output (connection state changes, subscription batches) while eliminating the high-frequency ping/pong entries that fire every 10 seconds per connection.
+
+## Redirecting to a Custom Logging Library
+
+Create a thin adapter that maps the SDK's `trace`/`info`/`error` interface onto your preferred logging library.
+
+<Tabs>
+  <Tab title="pino">
+    ```typescript
+    import { WebsocketClient } from 'coinbase-api';
+    import pino from 'pino';
+
+    const pinoLogger = pino({ level: 'debug' });
+
+    const logger = {
+      trace: (...params: any[]) => pinoLogger.trace(params),
+      info:  (...params: any[]) => pinoLogger.info(params),
+      error: (...params: any[]) => pinoLogger.error(params),
+    };
+
+    const ws = new WebsocketClient(
+      { apiKey: 'your_key', apiSecret: 'your_secret' },
+      logger,
+    );
+    ```
+  </Tab>
+  <Tab title="winston">
+    ```typescript
+    import { WebsocketClient } from 'coinbase-api';
+    import winston from 'winston';
+
+    const winstonLogger = winston.createLogger({
+      level: 'silly',
+      transports: [new winston.transports.Console()],
+    });
+
+    const logger = {
+      trace: (...params: any[]) => winstonLogger.silly(JSON.stringify(params)),
+      info:  (...params: any[]) => winstonLogger.info(JSON.stringify(params)),
+      error: (...params: any[]) => winstonLogger.error(JSON.stringify(params)),
+    };
+
+    const ws = new WebsocketClient(
+      { apiKey: 'your_key', apiSecret: 'your_secret' },
+      logger,
+    );
+    ```
+  </Tab>
+  <Tab title="Silent (test environments)">
+    ```typescript
+    import { WebsocketClient } from 'coinbase-api';
+
+    // Completely suppress all SDK output
+    const silentLogger = {
+      trace: () => {},
+      info:  () => {},
+      error: () => {},
+    };
+
+    const ws = new WebsocketClient(
+      { apiKey: 'your_key', apiSecret: 'your_secret' },
+      silentLogger,
+    );
+    ```
+  </Tab>
+</Tabs>
+
+## HTTP Request Tracing
+
+For REST clients, the SDK also supports low-level HTTP tracing via the `CBTRACE` environment variable. When set, every outgoing request and its response are logged to `console.log`:
+
+```bash
+CBTRACE=1 node your-script.js
+```
+
+This is implemented directly in `BaseRestClient` using Axios interceptors and is independent of the logger interface — it always writes to `console.log` and cannot be redirected.
+
+<Note>
+  `CBTRACE` is intended for debugging only. It logs full request URLs, method names, parameters, and response bodies, which may include sensitive data. Do not enable it in production.
+</Note>
+
+## Logger Interface Reference
+
+Your custom logger object must implement these three methods:
+
+| Method | Typical use in SDK | Default behaviour |
+|--------|--------------------|-------------------|
+| `trace(...params)` | Ping/pong frames, WS message sends, subscription batches | Silent |
+| `info(...params)` | Connection open/close/reconnect lifecycle | `console.info` |
+| `error(...params)` | Parse failures, unexpected WS errors | `console.error` |
+
+All three methods receive a variadic `...params` argument. The first element is typically a string message; subsequent elements may be objects with additional context.

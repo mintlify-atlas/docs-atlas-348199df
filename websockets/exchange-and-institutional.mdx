@@ -1,0 +1,279 @@
+---
+title: "Exchange, International & Prime WebSocket Feeds"
+sidebarTitle: "Exchange & Institutional"
+description: "Use WebsocketClient to connect to Coinbase Exchange, International, and Prime WebSocket feeds — each requires distinct WsKey values and authentication handling."
+---
+
+Coinbase's institutional-grade APIs — Exchange, International (INTX), and Prime — each expose their own WebSocket feed. All three use the same `WebsocketClient` and the same event model as Advanced Trade. The main difference is the WsKey you pass to `subscribe()`, and the credentials your client is initialised with.
+
+<Warning>
+  `internationalMarketData` and `primeMarketData` **always** require valid API credentials. There is no public (unauthenticated) access to these feeds. The SDK will throw if credentials are missing when you attempt to subscribe.
+</Warning>
+
+## WsKey reference
+
+| WsKey | Auth required | URL |
+|---|---|---|
+| `exchangeMarketData` | No | `wss://ws-feed.exchange.coinbase.com` |
+| `exchangeDirectMarketData` | Yes | `wss://ws-direct.exchange.coinbase.com` |
+| `internationalMarketData` | Always | `wss://ws-md.international.coinbase.com` |
+| `primeMarketData` | Always | `wss://ws-feed.prime.coinbase.com` |
+
+Sandbox URLs are available for Exchange and International — pass `useSandbox: true` when constructing the client.
+
+## Authentication differences
+
+Authentication for these products uses HMAC signing with an **API passphrase**, not JWT. Pass all three credentials to the constructor:
+
+```typescript
+import { WebsocketClient } from 'coinbase-api';
+
+const client = new WebsocketClient({
+  apiKey: process.env.API_KEY,
+  apiSecret: process.env.API_SECRET,
+  // The passphrase you set when creating the API key — NOT your account password
+  apiPassphrase: process.env.API_PASSPHRASE,
+});
+```
+
+The SDK signs each subscribe request automatically using the appropriate algorithm for the target feed:
+
+- **Exchange** — HMAC-SHA256 of `timestamp + "GET" + "/users/self/verify"`
+- **International** — HMAC-SHA256 of `timestamp + apiKey + "CBINTLMD" + passphrase`
+- **Prime** — HMAC-SHA256 of the channel name, access key, service account ID, timestamp, portfolio ID, and product IDs
+
+No manual signing is required.
+
+## Coinbase Exchange
+
+Exchange offers two feeds on different WsKey values. Use `exchangeMarketData` for unauthenticated market data, and `exchangeDirectMarketData` for authenticated channels that require direct server access.
+
+### Public feed (`exchangeMarketData`)
+
+```typescript
+import { WebsocketClient } from 'coinbase-api';
+
+const client = new WebsocketClient(); // no credentials needed
+
+client.on('open',        (data) => console.log('open:',      data?.wsKey));
+client.on('update',      (data) => console.info('data:',     JSON.stringify(data)));
+client.on('reconnect',   (data) => console.log('reconnect:', data));
+client.on('reconnected', (data) => console.log('reconnected:', data));
+client.on('close',       (data) => console.error('close:',   data));
+client.on('response',    (data) => console.info('response:', JSON.stringify(data, null, 2)));
+client.on('exception',   (data) => console.error('exception:', data));
+
+// Subscribe to multiple public Exchange channels at once
+client.subscribe(
+  [
+    // Heartbeat — confirm connection is alive per product
+    { topic: 'heartbeat',    payload: { product_ids: ['ETH-EUR'] } },
+    // Trading status for all products
+    'status',
+    // Open order book and auction data
+    { topic: 'auctionfeed',  payload: { product_ids: ['LTC-USD'] } },
+    // Trade matches (executions)
+    { topic: 'matches',      payload: { product_ids: ['BTC-USD'] } },
+    // RFQ matches — no product filter required
+    { topic: 'rfq_matches',  payload: {} },
+    // Best bid/ask per product
+    { topic: 'ticker',       payload: { product_ids: ['ETH-USD', 'BTC-USD'] } },
+    // Batched ticker updates
+    { topic: 'ticker_batch', payload: { product_ids: ['ETH-USD', 'BTC-USD'] } },
+    // Level-2 order book (batch updates)
+    { topic: 'level2_batch', payload: { product_ids: ['ETH-USD', 'BTC-USD'] } },
+  ],
+  'exchangeMarketData',
+);
+```
+
+### Authenticated direct feed (`exchangeDirectMarketData`)
+
+```typescript
+import { WebsocketClient } from 'coinbase-api';
+
+const client = new WebsocketClient({
+  apiKey: 'yourAPIKeyHere',
+  apiSecret: 'yourAPISecretHere',
+  apiPassphrase: 'yourAPIPassPhraseHere',
+  // Optional — connect to the sandbox environment
+  // useSandbox: true,
+});
+
+client.on('open',      (data) => console.log('open:',      data?.wsKey));
+client.on('update',    (data) => console.info('data:',     JSON.stringify(data)));
+client.on('response',  (data) => console.info('response:', JSON.stringify(data, null, 2)));
+client.on('exception', (data) => console.error('exception:', data));
+
+// The full channel streams every order lifecycle event
+client.subscribe(
+  { topic: 'full', payload: { product_ids: ['BTC-USD'] } },
+  'exchangeDirectMarketData',
+);
+
+// The balance channel streams account balance updates
+client.subscribe(
+  {
+    topic: 'balance',
+    payload: {
+      account_ids: [
+        'd50ec984-77a8-460a-b958-66f114b0de9b',
+        'd50ec984-77a8-460a-b958-66f114b0de9a',
+      ],
+    },
+  },
+  'exchangeDirectMarketData',
+);
+
+// Subscribe to multiple authenticated channels at once
+client.subscribe(
+  [
+    { topic: 'full',    payload: { product_ids: ['BTC-USD'] } },
+    { topic: 'user',    payload: { product_ids: ['BTC-USD'] } },
+    { topic: 'level2',  payload: { product_ids: ['BTC-USD'] } },
+    {
+      topic: 'balance',
+      payload: {
+        account_ids: [
+          'd50ec984-77a8-460a-b958-66f114b0de9b',
+          'd50ec984-77a8-460a-b958-66f114b0de9a',
+        ],
+      },
+    },
+  ],
+  'exchangeDirectMarketData',
+);
+```
+
+### Exchange channel reference
+
+| Channel | Feed | Description |
+|---|---|---|
+| `heartbeat` | Public | Per-product heartbeat to confirm the connection |
+| `status` | Public | Trading status for all listed products |
+| `ticker` | Public | Best bid/ask and last trade price |
+| `ticker_batch` | Public | Batched ticker updates |
+| `matches` | Public | Trade executions (matches) |
+| `rfq_matches` | Public | RFQ trade matches |
+| `auctionfeed` | Public | Open order book and auction data |
+| `level2_batch` | Public | Batched level-2 order book updates |
+| `full` | Auth | Full order lifecycle events |
+| `level2` | Auth | Level-2 order book (direct feed) |
+| `user` | Auth | Authenticated user's orders |
+| `balance` | Auth | Account balance updates |
+
+## Coinbase International (INTX)
+
+<Warning>
+  The International feed always requires authentication. Attempting to subscribe without credentials will throw an error.
+</Warning>
+
+```typescript
+import { WebsocketClient, WsTopicRequest } from 'coinbase-api';
+
+const client = new WebsocketClient({
+  apiKey:        process.env.CB_INTX_API_KEY,
+  apiSecret:     process.env.CB_INTX_API_SECRET,
+  apiPassphrase: process.env.CB_INTX_API_PASSPHRASE,
+});
+
+client.on('open',        (data) => console.log('open:',      data?.wsKey));
+client.on('update',      (data) => console.info('data:',     JSON.stringify(data)));
+client.on('reconnect',   (data) => console.log('reconnect:', data));
+client.on('reconnected', (data) => console.log('reconnected:', data));
+client.on('close',       (data) => console.error('close:',   data));
+client.on('response',    (data) => console.info('response:', JSON.stringify(data, null, 2)));
+client.on('exception',   (data) => console.error('exception:', data));
+
+// Subscribe to level-1 order book for BTC perpetuals
+const orderbookRequest: WsTopicRequest = {
+  topic: 'LEVEL1',
+  payload: {
+    product_ids: ['BTC-PERP'],
+  },
+};
+
+client.subscribe(orderbookRequest, 'internationalMarketData');
+```
+
+<Note>
+  As of September 2024, the INTX WebSocket does not support nested parameters inside the `channels` array. The SDK works around this by sending one subscription request per topic — this is handled automatically and requires no changes to your code.
+</Note>
+
+## Coinbase Prime
+
+<Warning>
+  The Prime feed always requires authentication. All credentials — `apiKey`, `apiSecret`, and `apiPassphrase` — are mandatory.
+</Warning>
+
+Prime authentication signs each request using the channel name, access key, service account ID, timestamp, portfolio ID, and an optional list of product IDs. The SDK generates and attaches this signature for every subscription request.
+
+```typescript
+import { WebsocketClient } from 'coinbase-api';
+
+const client = new WebsocketClient({
+  apiKey:        process.env.CB_PRIME_API_KEY,
+  apiSecret:     process.env.CB_PRIME_API_SECRET,
+  apiPassphrase: process.env.CB_PRIME_API_PASSPHRASE,
+});
+
+client.on('open',        (data) => console.log('open:',      data?.wsKey));
+client.on('update',      (data) => console.info('data:',     JSON.stringify(data)));
+client.on('reconnect',   (data) => console.log('reconnect:', data));
+client.on('reconnected', (data) => console.log('reconnected:', data));
+client.on('close',       (data) => console.error('close:',   data));
+client.on('response',    (data) => console.info('response:', JSON.stringify(data, null, 2)));
+client.on('exception',   (data) => console.error('exception:', data));
+
+client.subscribe(
+  {
+    topic: 'market_trades',
+    payload: {
+      product_ids: ['BTC-USD'],
+    },
+  },
+  'primeMarketData',
+);
+```
+
+## Shared event handling
+
+The event model is identical across all feeds. The `update` event fires whenever a message arrives from any channel; use the `wsKey` field in the payload to distinguish sources if you share one client across multiple feeds.
+
+```typescript
+client.on('update', (data) => {
+  switch (data.wsKey) {
+    case 'exchangeMarketData':
+      // Exchange public data — data.type identifies the channel
+      break;
+    case 'exchangeDirectMarketData':
+      // Exchange authenticated data
+      break;
+    case 'internationalMarketData':
+      // INTX data
+      break;
+    case 'primeMarketData':
+      // Prime data
+      break;
+  }
+});
+```
+
+## Sandbox support
+
+Exchange and International support a sandbox environment. Pass `useSandbox: true` to redirect all connections to the sandbox URLs automatically:
+
+```typescript
+const client = new WebsocketClient({
+  apiKey:        process.env.API_KEY,
+  apiSecret:     process.env.API_SECRET,
+  apiPassphrase: process.env.API_PASSPHRASE,
+  useSandbox:    true,
+});
+```
+
+| Feed | Sandbox URL |
+|---|---|
+| Exchange public | `wss://ws-feed-public.sandbox.exchange.coinbase.com` |
+| Exchange direct | `wss://ws-direct.sandbox.exchange.coinbase.com` |
+| International | `wss://ws-md.n5e2.coinbase.com` |

@@ -1,0 +1,145 @@
+---
+title: "Use coinbase-api in a Browser with Webpack"
+sidebarTitle: "Browser Usage"
+description: "Build a browser-ready bundle of the coinbase-api SDK using webpack to use REST clients and WebSockets in frontend JavaScript applications."
+---
+
+The `coinbase-api` SDK is isomorphic — it is designed to work in both Node.js server environments and browser/frontend applications. A webpack configuration is included in the repository to produce a browser-compatible UMD bundle from the compiled TypeScript output.
+
+<Tip>
+  The same `import` or `require` statements work in both Node.js and browser environments. The SDK automatically uses the Web Crypto API for request signing in browsers instead of Node's `crypto` module.
+</Tip>
+
+## Building the Browser Bundle
+
+<Steps>
+  <Step title="Install dependencies">
+    From the root of the cloned `coinbase-api` repository, install all Node.js dependencies:
+
+    ```bash
+    npm install
+    ```
+  </Step>
+
+  <Step title="Compile TypeScript">
+    Build the CJS and ESM output from source:
+
+    ```bash
+    npm run build
+    ```
+
+    This compiles the TypeScript source from `src/` into `dist/cjs/` and `dist/esm/`.
+  </Step>
+
+  <Step title="Bundle with webpack">
+    Run the webpack bundler to produce a browser-ready UMD bundle:
+
+    ```bash
+    npm run pack
+    ```
+
+    Webpack reads from `dist/cjs/index.js` (the CJS build output) and writes the final bundle to `dist/coinbaseapi.js`, along with a source map at `dist/coinbaseapi.map`.
+  </Step>
+
+  <Step title="Use the bundle in your frontend">
+    Include the bundle in your HTML or import it in your frontend build pipeline:
+
+    ```html
+    <script src="dist/coinbaseapi.js"></script>
+    <script>
+      // The bundle exposes the SDK as the global "coinbaseapi"
+      const { CBAdvancedTradeClient, WebsocketClient } = coinbaseapi;
+    </script>
+    ```
+
+    Or, if you are using a module bundler in your own project (Vite, webpack, Rollup), import directly from the npm package as usual:
+
+    ```typescript
+    import { CBAdvancedTradeClient, WebsocketClient } from 'coinbase-api';
+    ```
+  </Step>
+</Steps>
+
+## Webpack Configuration
+
+The bundle is configured in `webpack/webpack.config.cjs`. Key settings:
+
+```javascript
+// webpack/webpack.config.cjs
+module.exports = {
+  entry: './dist/cjs/index.js',
+  output: {
+    path: path.resolve(__dirname, '../dist'),
+    filename: 'coinbaseapi.js',   // output bundle name
+    library: 'coinbaseapi',       // global variable name in browser
+    libraryTarget: 'umd',         // Universal Module Definition
+  },
+  mode: 'production',
+  resolve: {
+    fallback: {
+      // Node.js built-ins not available in browsers — polyfilled to false
+      'http':   false,
+      'https':  false,
+      'crypto': false,
+    },
+  },
+};
+```
+
+The `fallback` configuration is important: it tells webpack to replace Node.js-only modules (`http`, `https`, `crypto`) with empty stubs in the browser bundle. The SDK handles this transparently — request signing switches to the browser-native Web Crypto API automatically.
+
+## Node.js vs Browser Differences
+
+<CodeGroup>
+  ```typescript Node.js
+  // In Node.js, JWT signing uses the 'jose' library
+  // with Node's built-in crypto module (jwtNode.ts)
+
+  // HTTP keep-alive uses Node's https.Agent
+  const client = new CBAdvancedTradeClient({
+    apiKey: 'your_key',
+    apiSecret: 'your_secret',
+    keepAlive: true, // uses https.Agent — Node.js only
+  });
+  ```
+
+  ```typescript Browser
+  // In browsers, request signing uses the Web Crypto API
+  // via webCryptoAPI.ts — no polyfill needed
+
+  // keepAlive is not applicable in browsers
+  // (browsers manage connection pooling natively)
+  const client = new CBAdvancedTradeClient({
+    apiKey: 'your_key',
+    apiSecret: 'your_secret',
+    // keepAlive is silently ignored in browser builds
+  });
+  ```
+</CodeGroup>
+
+| Feature | Node.js | Browser |
+|---------|---------|---------|
+| JWT / request signing | `jose` + Node `crypto` | Web Crypto API |
+| HTTP keep-alive | `https.Agent` | Native browser pooling |
+| WebSocket | `ws` via `isomorphic-ws` | Native browser `WebSocket` |
+| Bundle size | Full source | Minified UMD bundle |
+
+## Security Warning
+
+<Warning>
+  **Never expose your Coinbase API private key in client-side JavaScript.** Any credentials bundled into browser code or embedded in HTML are visible to anyone who opens the browser developer tools.
+
+  For authenticated REST API calls in a browser application, use a **proxy server** pattern:
+
+  1. Your frontend sends requests to your own backend server (e.g. an Express or Next.js API route).
+  2. Your backend holds the API keys securely and forwards calls to Coinbase on the frontend's behalf.
+  3. Your backend applies rate limiting, authentication, and authorisation before proxying.
+
+  Public WebSocket topics (market data, order books, ticker) do not require API keys and are safe to use directly from the browser.
+</Warning>
+
+## Current Limitations
+
+<Note>
+  Browser bundle documentation is still being expanded. Behavioural differences between Node.js and browser environments are still being documented. If you encounter any issues using the SDK in a browser, please [open an issue on GitHub](https://github.com/tiagosiebler/coinbase-api/issues).
+</Note>

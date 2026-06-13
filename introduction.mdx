@@ -1,0 +1,141 @@
+---
+title: "Coinbase API SDK: JavaScript & TypeScript SDK for Every Coinbase API"
+sidebarTitle: "Introduction"
+description: "coinbase-api is a complete Node.js SDK for Coinbase's Advanced Trade, App, Exchange, International, Prime, and Commerce REST APIs and WebSockets."
+---
+
+The `coinbase-api` npm package is a professional, production-ready Node.js SDK that provides a unified interface to every Coinbase REST API and WebSocket feed. It is actively maintained, battle-tested in live trading environments, and ships with full TypeScript declarations so your editor can autocomplete every request parameter and response field.
+
+## Why coinbase-api?
+
+Coinbase operates six distinct API surfaces — each targeting a different user type and product. Rather than juggling six separate HTTP wrappers, `coinbase-api` gives you a single, consistent package with dedicated clients for each platform:
+
+- **Strongly typed** — every request and response is modelled in TypeScript.
+- **Promise-driven** — all REST methods return native Promises; `async/await` just works.
+- **Dual module output** — ships compiled ESM and CJS, so it works in any Node.js project regardless of `"type"` field.
+- **Browser bundle** — a webpack build is included for frontend usage.
+- **Proxy support** — powered by `axios`, so standard proxy configuration applies without any extra wrapping.
+- **Automatic key detection** — pass ECDSA or ED25519 private keys; the SDK detects the format and signs correctly every time.
+- **Robust WebSocket layer** — auto-reconnect, resubscribe on reconnect, configurable heartbeats, and event-driven message dispatch.
+
+<Note>
+  **Upcoming change:** As part of the [Siebly.io](https://siebly.io/?ref=ghcoinbase) brand, this SDK will soon be hosted under the [Siebly.io GitHub organisation](https://github.com/sieblyio). The migration is seamless and requires no changes from users.
+</Note>
+
+## REST Clients
+
+Each Coinbase product group has its own REST client. Import only what you need.
+
+<CardGroup cols={2}>
+  <Card title="CBAdvancedTradeClient" icon="chart-line" href="/rest/advanced-trade">
+    Coinbase's modern retail and algorithmic trading platform. Supports spot and futures orders, order management, portfolios, and product data.
+  </Card>
+  <Card title="CBAppClient" icon="mobile" href="/rest/coinbase-app">
+    Consumer-facing Coinbase mobile and web app APIs. Manage wallets, send/receive funds, and query transaction history programmatically.
+  </Card>
+  <Card title="CBExchangeClient" icon="building-columns" href="/rest/exchange">
+    The professional Coinbase Exchange (formerly Coinbase Pro) REST API. Full order book access, fills, accounts, and payment methods.
+  </Card>
+  <Card title="CBInternationalClient" icon="globe" href="/rest/international">
+    Institutional cross-border trading via the Coinbase International Exchange. Designed for large-volume, multi-currency institutional flows.
+  </Card>
+  <Card title="CBPrimeClient" icon="shield-halved" href="/rest/prime">
+    Institutional custody and trading through Coinbase Prime. Portfolio management, allocations, and wallet operations for institutions.
+  </Card>
+  <Card title="CBCommerceClient" icon="credit-card" href="/rest/commerce">
+    Accept cryptocurrency payments via Coinbase Commerce. Create charges, manage invoices, and handle on-chain payment events.
+  </Card>
+</CardGroup>
+
+## WebSocket Client
+
+A single `WebsocketClient` class handles every Coinbase WebSocket feed — public market data and private user data alike. You pass a WsKey string to route subscriptions to the correct upstream connection, and the client manages keep-alive pings, reconnection, and resubscription automatically.
+
+```typescript
+import { WebsocketClient } from 'coinbase-api';
+
+const ws = new WebsocketClient({
+  apiKey: process.env.API_KEY_NAME,
+  apiSecret: process.env.API_PRIVATE_KEY,
+});
+
+ws.on('update', (data) => console.log('market data:', data));
+ws.on('reconnected', (data) => console.log('reconnected:', data.wsKey));
+
+// Subscribe to BTC-USD ticker on Advanced Trade public feed
+ws.subscribe(
+  { topic: 'ticker', payload: { product_ids: ['BTC-USD'] } },
+  'advTradeMarketData',
+);
+```
+
+Key WebSocket features:
+
+- **Auto-reconnect** — dropped connections are restored automatically; a `reconnected` event fires when live again.
+- **Resubscribe on reconnect** — all active subscriptions are replayed after reconnection with no extra code.
+- **Event-driven** — listen to `open`, `update`, `response`, `reconnect`, `reconnected`, `close`, and `exception` events.
+- **Public & private streams** — unauthenticated market data and authenticated user data streams across all platforms.
+
+## TypeScript Support
+
+The SDK is written in TypeScript and exports type declarations for the vast majority of API request parameters and response shapes. You get full IntelliSense support in VS Code and other editors without any additional `@types` package.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+import type { SubmitAdvTradeOrderRequest } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: process.env.API_KEY_NAME!,
+  apiSecret: process.env.API_PRIVATE_KEY!,
+});
+
+// `order` is fully typed — TypeScript will catch missing required fields
+const order: SubmitAdvTradeOrderRequest = {
+  product_id: 'BTC-USDT',
+  side: 'BUY',
+  client_order_id: client.generateNewOrderId(),
+  order_configuration: {
+    limit_limit_gtc: { base_size: '0.01', limit_price: '60000.00' },
+  },
+};
+
+const result = await client.submitOrder(order);
+```
+
+## Authentication
+
+`coinbase-api` supports two authentication schemes depending on which client you use:
+
+- **JWT (ECDSA / ED25519)** — `CBAdvancedTradeClient` and `CBAppClient` use short-lived JWTs signed with your CDP API private key. Both key formats are detected automatically.
+- **API Key + Secret + Passphrase** — `CBExchangeClient`, `CBInternationalClient`, and `CBPrimeClient` use HMAC-signed requests with an additional passphrase.
+
+See the [Authentication guide](/authentication) for full configuration details.
+
+## Module Formats & Browser Usage
+
+The package ships with both an ESM build (`dist/mjs/`) and a CommonJS build (`dist/cjs/`). Node.js will select the right one automatically based on your project's module system.
+
+```javascript
+// ESM (TypeScript, .mjs, or "type": "module" projects)
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+// CJS (require-based projects)
+const { CBAdvancedTradeClient } = require('coinbase-api');
+```
+
+For browser or frontend bundling, run `npm run build && npm run pack` inside a clone of the repository. The resulting webpack bundle is placed in `dist/` and can be loaded directly in a browser.
+
+## Proxy Support
+
+Because the SDK uses `axios` under the hood, you can configure HTTP proxies via the standard `axios` proxy options or by setting the `HTTP_PROXY` / `HTTPS_PROXY` environment variables — no extra configuration needed on the `RestClientOptions` level.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install the SDK and make your first API call in under five minutes.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Configure credentials for JWT-based and passphrase-based clients.
+  </Card>
+</CardGroup>

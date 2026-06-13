@@ -1,0 +1,298 @@
+---
+title: "WebsocketClient API Reference — Methods & Options"
+sidebarTitle: "WebsocketClient"
+description: "Full API reference for WebsocketClient — constructor options, connect, subscribe, unsubscribe, sendWSAPIRequest, connectAll, and emitted event types."
+---
+
+`WebsocketClient` is the unified WebSocket client for all Coinbase real-time feeds. It manages six simultaneous WebSocket connections across Advanced Trade, Exchange, International, and Prime — handling authentication, reconnection, and topic subscription automatically.
+
+## Installation & Setup
+
+```typescript
+import { WebsocketClient, WS_KEY_MAP } from 'coinbase-api';
+
+const wsClient = new WebsocketClient({
+  apiKey: 'YOUR_API_KEY_NAME',
+  apiSecret: 'YOUR_API_PRIVATE_KEY', // EC private key for Advanced Trade / App
+  apiPassphrase: 'YOUR_PASSPHRASE',  // Required for Exchange, International, Prime
+});
+```
+
+---
+
+## Constructor
+
+```typescript
+new WebsocketClient(options?: WSClientConfigurableOptions, logger?: Logger)
+```
+
+The constructor accepts an options object and an optional custom logger. All fields are optional — public feeds work without credentials, while private feeds require the relevant auth fields.
+
+### `WSClientConfigurableOptions`
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `apiKey` | `string` | API key name (CDP key name for Advanced Trade / App; API key for Exchange, International, Prime). |
+| `apiSecret` | `string` | EC private key PEM string (Advanced Trade / App) or HMAC secret (Exchange, International, Prime). |
+| `apiPassphrase` | `string` | API passphrase. Required for Coinbase Exchange, International, and Prime WebSocket feeds. |
+| `jwtExpiresSeconds` | `number` | Seconds until the JWT expires for Advanced Trade auth. Defaults to `120`. |
+| `pingInterval` | `number` | How often (ms) to send an upstream ping to keep the connection alive. Defaults to `10000`. |
+| `pongTimeout` | `number` | How long (ms) to wait for a pong before treating the connection as dead. Defaults to `1000`. |
+| `reconnectTimeout` | `number` | Delay (ms) before spawning a reconnection attempt. Defaults to `500`. |
+| `useSandbox` | `boolean` | Connect to sandbox URLs where available (Exchange and International only). |
+| `wsUrl` | `string` | Override the WebSocket URL for all connections. |
+| `wsOptions` | `object` | Additional options passed directly to the `ws` library (e.g. custom agent, protocols). |
+| `customSignMessageFn` | `function` | Provide your own HMAC-SHA256 signing implementation (e.g. Node.js `createHmac` for better performance). |
+| `reauthWSAPIOnReconnect` | `boolean` | Re-authenticate the WS API channel automatically on reconnect. Defaults to `false`. |
+
+---
+
+## WS_KEY_MAP
+
+Each of the six WebSocket connections is identified by a `WsKey` string constant from `WS_KEY_MAP`. Pass the appropriate key when calling `subscribe`, `unsubscribe`, or `connect`.
+
+| Key | Value | URL (livenet) | Auth Required |
+|-----|-------|---------------|:-------------:|
+| `WS_KEY_MAP.advTradeMarketData` | `"advTradeMarketData"` | `wss://advanced-trade-ws.coinbase.com` | — |
+| `WS_KEY_MAP.advTradeUserData` | `"advTradeUserData"` | `wss://advanced-trade-ws-user.coinbase.com` | 🔒 |
+| `WS_KEY_MAP.exchangeMarketData` | `"exchangeMarketData"` | `wss://ws-feed.exchange.coinbase.com` | — |
+| `WS_KEY_MAP.exchangeDirectMarketData` | `"exchangeDirectMarketData"` | `wss://ws-direct.exchange.coinbase.com` | 🔒 |
+| `WS_KEY_MAP.internationalMarketData` | `"internationalMarketData"` | `wss://ws-md.international.coinbase.com` | 🔒 |
+| `WS_KEY_MAP.primeMarketData` | `"primeMarketData"` | `wss://ws-feed.prime.coinbase.com` | 🔒 |
+
+<Note>
+  Sandbox WebSocket URLs are available for Exchange (`wss://ws-feed-public.sandbox.exchange.coinbase.com` / `wss://ws-direct.sandbox.exchange.coinbase.com`) and International (`wss://ws-md.n5e2.coinbase.com`). Pass `useSandbox: true` to the constructor to use them automatically.
+</Note>
+
+---
+
+## Methods
+
+### `connectAll()`
+
+Initiates connections for **all six** WebSocket feeds simultaneously. Returns a `Promise` that resolves with an array of `WSConnectedResult | undefined` — one entry per connection.
+
+```typescript
+await wsClient.connectAll();
+console.log('All WebSocket connections initiated.');
+```
+
+You don't need to call `connectAll()` explicitly — connections are established automatically on the first `subscribe()` call. Use `connectAll()` when you want to pre-establish all connections up front.
+
+### `subscribe(requests, wsKey)`
+
+Subscribes to one or more topics on a specific WebSocket connection. Accepts a single topic, a `WsTopicRequest` object, or an array of either. Resubscription after a reconnect is automatic.
+
+```typescript
+subscribe(
+  requests: WsTopicRequest<string> | string | (WsTopicRequest<string> | string)[],
+  wsKey: WsKey
+): void
+```
+
+**String topic** — simplest form, no additional parameters:
+
+```typescript
+wsClient.subscribe('heartbeats', WS_KEY_MAP.advTradeMarketData);
+```
+
+**`WsTopicRequest` object** — use this when the channel requires additional parameters like `product_ids`:
+
+```typescript
+wsClient.subscribe(
+  {
+    topic: 'ticker',
+    payload: { product_ids: ['BTC-USD', 'ETH-USD'] },
+  },
+  WS_KEY_MAP.advTradeMarketData
+);
+```
+
+**Array of mixed topics:**
+
+```typescript
+wsClient.subscribe(
+  [
+    'heartbeats',
+    { topic: 'ticker', payload: { product_ids: ['BTC-USD'] } },
+    { topic: 'candles', payload: { product_ids: ['ETH-USD'] } },
+  ],
+  WS_KEY_MAP.advTradeMarketData
+);
+```
+
+### `unsubscribe(requests, wsKey)`
+
+Removes subscription(s) from a WebSocket connection. Topics removed via `unsubscribe` are also removed from the reconnect cache and will not be re-subscribed after a reconnect.
+
+```typescript
+unsubscribe(
+  requests: WsTopicRequest<string> | string | (WsTopicRequest<string> | string)[],
+  wsKey: WsKey
+): void
+```
+
+```typescript
+wsClient.unsubscribe(
+  { topic: 'ticker', payload: { product_ids: ['BTC-USD'] } },
+  WS_KEY_MAP.advTradeMarketData
+);
+```
+
+### `sendWSAPIRequest(wsKey, channel, params?)`
+
+Sends a raw WebSocket API request. This is a low-level method; for most use cases, use `subscribe` / `unsubscribe` instead.
+
+<Note>
+  `sendWSAPIRequest` is defined in the base class but returns `undefined` for Coinbase WebSockets — the WS API pattern is not fully implemented for this exchange. Use `subscribe` for all subscription management.
+</Note>
+
+---
+
+## `WsTopicRequest<T>` Interface
+
+```typescript
+interface WsTopicRequest<TWSTopic extends string = string, TWSPayload = any> {
+  /** The channel/topic name to subscribe to. */
+  topic: TWSTopic;
+  /**
+   * Optional parameters merged into the subscription request.
+   * E.g., { product_ids: ['BTC-USD'] } for market data channels.
+   */
+  payload?: TWSPayload;
+}
+```
+
+---
+
+## `WSConnectedResult` Type
+
+Returned by `connectAll()` and the underlying `connect()` method on a successful connection.
+
+```typescript
+interface WSConnectedResult {
+  wsKey: string; // The WsKey for the connection that completed
+}
+```
+
+---
+
+## Events
+
+`WebsocketClient` extends `EventEmitter`. Listen to events with `.on(eventName, handler)`.
+
+### `open`
+
+Emitted when a new WebSocket connection is opened for the first time.
+
+```typescript
+wsClient.on('open', ({ wsKey, event }) => {
+  console.log(`Connection opened: ${wsKey}`);
+});
+```
+
+### `reconnect`
+
+Emitted when a dropped connection is in the process of reconnecting.
+
+```typescript
+wsClient.on('reconnect', ({ wsKey, event }) => {
+  console.log(`Reconnecting: ${wsKey}`);
+});
+```
+
+### `reconnected`
+
+Emitted after a dropped connection has successfully reconnected. Topic re-subscription is automatic after this event.
+
+```typescript
+wsClient.on('reconnected', ({ wsKey, event }) => {
+  console.log(`Reconnected: ${wsKey}`);
+});
+```
+
+### `close`
+
+Emitted when a WebSocket connection is closed.
+
+```typescript
+wsClient.on('close', ({ wsKey, event }) => {
+  console.log(`Connection closed: ${wsKey}`);
+});
+```
+
+### `response`
+
+Emitted in response to subscription/unsubscription requests (e.g. the `subscriptions` confirmation message from Advanced Trade). Use this to verify that a subscription succeeded.
+
+```typescript
+wsClient.on('response', (response) => {
+  console.log(`Subscription response on ${response.wsKey}:`, response);
+});
+```
+
+### `update`
+
+The primary data event. Emitted for every incoming market data message. The `wsKey` field on the payload identifies which connection the message arrived on.
+
+```typescript
+wsClient.on('update', (data) => {
+  // data.wsKey tells you which connection this came from
+  // For Advanced Trade: data.channel, data.events[]
+  // For Exchange: data.type, plus channel-specific fields
+  console.log(`[${data.wsKey}] Update:`, data);
+});
+```
+
+### `exception`
+
+Emitted when a parsing error occurs or the exchange sends an error message (e.g. rate limit exceeded).
+
+```typescript
+wsClient.on('exception', (error) => {
+  console.error(`WebSocket exception on ${error.wsKey}:`, error);
+});
+```
+
+---
+
+## Full Example
+
+```typescript
+import { WebsocketClient, WS_KEY_MAP } from 'coinbase-api';
+
+const wsClient = new WebsocketClient({
+  apiKey: process.env.CB_API_KEY!,
+  apiSecret: process.env.CB_API_SECRET!,
+  apiPassphrase: process.env.CB_API_PASSPHRASE!,
+});
+
+// Listen for market data updates
+wsClient.on('update', (data) => {
+  if (data.wsKey === WS_KEY_MAP.advTradeMarketData) {
+    console.log('Advanced Trade update:', data.channel, data.events);
+  }
+});
+
+// Handle errors and reconnections
+wsClient.on('exception', (err) => console.error('Error:', err));
+wsClient.on('reconnected', ({ wsKey }) => console.log('Reconnected:', wsKey));
+
+// Subscribe to Advanced Trade ticker for BTC-USD and ETH-USD
+wsClient.subscribe(
+  [
+    'heartbeats',
+    { topic: 'ticker', payload: { product_ids: ['BTC-USD', 'ETH-USD'] } },
+  ],
+  WS_KEY_MAP.advTradeMarketData
+);
+
+// Subscribe to private user order updates (requires auth)
+wsClient.subscribe('user', WS_KEY_MAP.advTradeUserData);
+
+// Subscribe to Exchange public order book
+wsClient.subscribe(
+  [{ topic: 'level2', channels: [{ name: 'level2', product_ids: ['BTC-USD'] }] }],
+  WS_KEY_MAP.exchangeMarketData
+);
+```

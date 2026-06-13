@@ -1,0 +1,251 @@
+---
+title: "Advanced Trade Futures & Margin API Reference"
+sidebarTitle: "Futures"
+description: "Manage Coinbase Advanced Trade CFM futures — balance summaries, positions, sweeps, intraday margin settings, and the current margin window."
+---
+
+The Futures endpoints cover Coinbase Financial Markets (CFM) regulated futures products. They let you inspect your futures-account balance and open positions, manage fund sweeps between your FCM wallet and USD spot wallet, and control intraday margin settings. Futures and spot balances are held in separate accounts — cash is automatically moved from spot to CFM to meet margin requirements, but you can sweep excess cash back to spot via the sweep endpoints.
+
+---
+
+## getFuturesBalanceSummary
+
+Retrieve a comprehensive summary of your CFM futures account balance, including buying power, margin levels, unrealised PnL, and intraday versus overnight margin window measures.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/cfm/balance_summary` |
+
+No parameters.
+
+**Returns:** `Promise<{ balance_summary: AdvTradeFuturesBalance }>` — the summary includes `futures_buying_power`, `total_usd_balance`, `cbi_usd_balance` (spot), `cfm_usd_balance` (futures), `unrealized_pnl`, `daily_realized_pnl`, `initial_margin`, `available_margin`, `liquidation_threshold`, `liquidation_buffer_amount`, `liquidation_buffer_percentage`, and nested `intraday_margin_window_measure` / `overnight_margin_window_measure` objects.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your-api-key-name',
+  apiSecret: '-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n',
+});
+
+const { balance_summary } = await client.getFuturesBalanceSummary();
+
+console.log('Futures buying power:', balance_summary.futures_buying_power.value);
+console.log('Unrealised PnL:',       balance_summary.unrealized_pnl.value);
+console.log('Available margin:',      balance_summary.available_margin.value);
+```
+
+---
+
+## getIntradayMarginSetting
+
+Retrieve the current intraday margin setting for your futures account.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/cfm/intraday/margin_setting` |
+
+No parameters.
+
+**Returns:** `Promise<{ setting: string }>` — the setting string is one of:
+
+| Value | Meaning |
+|---|---|
+| `INTRADAY_MARGIN_SETTING_UNSPECIFIED` | Setting not yet configured |
+| `INTRADAY_MARGIN_SETTING_STANDARD` | Standard (overnight) margin requirements apply all day |
+| `INTRADAY_MARGIN_SETTING_INTRADAY` | Reduced intraday margin applies from 8 am – 4 pm ET |
+
+```typescript
+const { setting } = await client.getIntradayMarginSetting();
+console.log('Current margin setting:', setting);
+```
+
+---
+
+## setIntradayMarginSetting
+
+Update the intraday margin setting for your futures account. Opt into increased intraday leverage (8 am – 4 pm ET) or revert to standard overnight margin requirements.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/cfm/intraday/margin_setting` |
+
+<ParamField body="setting" type="string">
+  The desired margin setting. One of `"INTRADAY_MARGIN_SETTING_UNSPECIFIED"`, `"INTRADAY_MARGIN_SETTING_STANDARD"`, or `"INTRADAY_MARGIN_SETTING_INTRADAY"`.
+</ParamField>
+
+**Returns:** `Promise<any>` — an empty response on success.
+
+```typescript
+// Opt into intraday (higher leverage) margin
+await client.setIntradayMarginSetting({
+  setting: 'INTRADAY_MARGIN_SETTING_INTRADAY',
+});
+console.log('Intraday margin setting applied');
+```
+
+---
+
+## getCurrentMarginWindow
+
+Retrieve the current active margin window type and its end time, along with killswitch status flags for intraday margin enrollment.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/cfm/intraday/current_margin_window` |
+
+<ParamField query="margin_profile_type" type="string">
+  Filter by margin profile. One of:
+  - `"MARGIN_PROFILE_TYPE_UNSPECIFIED"`
+  - `"MARGIN_PROFILE_TYPE_RETAIL_REGULAR"`
+  - `"MARGIN_PROFILE_TYPE_RETAIL_INTRADAY_MARGIN_1"`
+</ParamField>
+
+**Returns:** `Promise<AdvTradeCurrentMarginWindow>` — contains:
+- `margin_window.margin_window_type` — one of `MARGIN_WINDOW_TYPE_OVERNIGHT`, `MARGIN_WINDOW_TYPE_WEEKEND`, `MARGIN_WINDOW_TYPE_INTRADAY`, `MARGIN_WINDOW_TYPE_TRANSITION`, or `MARGIN_WINDOW_TYPE_UNSPECIFIED`
+- `margin_window.end_time` — RFC3339 timestamp when the window ends
+- `is_intraday_margin_killswitch_enabled` — `true` if the intraday killswitch is active
+- `is_intraday_margin_enrollment_killswitch_enabled` — `true` if enrollment is currently locked
+
+```typescript
+const marginWindow = await client.getCurrentMarginWindow();
+
+console.log('Window type:', marginWindow.margin_window.margin_window_type);
+console.log('Window ends:', marginWindow.margin_window.end_time);
+console.log('Killswitch active:', marginWindow.is_intraday_margin_killswitch_enabled);
+```
+
+---
+
+## getFuturesPositions
+
+List all open positions in CFM futures products.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/cfm/positions` |
+
+No parameters.
+
+**Returns:** `Promise<{ positions: AdvTradeFuturesPosition[] }>` — each position contains `product_id`, `expiration_time` (RFC3339), `side` (`"LONG"` | `"SHORT"` | `"UNKNOWN"`), `number_of_contracts`, `current_price`, `avg_entry_price`, `unrealized_pnl`, and `daily_realized_pnl`.
+
+```typescript
+const { positions } = await client.getFuturesPositions();
+
+positions.forEach(pos => {
+  console.log(
+    `${pos.product_id}: ${pos.side} ${pos.number_of_contracts} contracts`,
+    `@ avg entry ${pos.avg_entry_price}`,
+    `| unrealised PnL: ${pos.unrealized_pnl}`,
+  );
+});
+```
+
+---
+
+## getFuturesPosition
+
+Retrieve a specific CFM futures position by product ID.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/cfm/positions/{product_id}` |
+
+<ParamField path="product_id" type="string" required>
+  The futures product ID, e.g. `"BTC-28JUN24-CDE"`.
+</ParamField>
+
+**Returns:** `Promise<{ position: AdvTradeFuturesPosition }>` — the full position record for the specified contract.
+
+```typescript
+const { position } = await client.getFuturesPosition({
+  product_id: 'BTC-28JUN24-CDE',
+});
+
+console.log(`Contracts: ${position.number_of_contracts}`);
+console.log(`Unrealised PnL: ${position.unrealized_pnl}`);
+```
+
+---
+
+## scheduleFuturesSweep
+
+Schedule a sweep of funds from your FCM wallet to your USD spot wallet. Only one pending sweep is allowed at a time.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/cfm/sweeps/schedule` |
+
+<ParamField body="usd_amount" type="string">
+  The USD amount to sweep as a decimal string, e.g. `"500.00"`. Omit to sweep all available excess funds.
+</ParamField>
+
+<Tip>
+  Sweeps submitted before **5 PM ET** are processed the next business day. Sweeps submitted after 5 PM ET are processed in two business days. Market movements may affect the final amount transferred.
+</Tip>
+
+**Returns:** `Promise<{ success: boolean }>`.
+
+```typescript
+// Schedule a sweep of $500 to spot
+const { success } = await client.scheduleFuturesSweep({
+  usd_amount: '500.00',
+});
+console.log('Sweep scheduled:', success);
+
+// Sweep all available excess (no amount specified)
+await client.scheduleFuturesSweep();
+```
+
+---
+
+## getFuturesSweeps
+
+List all pending and in-progress sweeps from your FCM wallet to your USD spot wallet.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/cfm/sweeps` |
+
+No parameters.
+
+**Returns:** `Promise<{ sweeps: AdvTradeFuturesSweep[] }>` — each sweep has `id`, `requested_amount` (value + currency), `should_sweep_all`, `status` (`"PENDING"` | `"PROCESSING"` | `"UNKNOWN_FCM_SWEEP_STATUS"`), and `scheduled_time` (RFC3339). Completed sweeps no longer appear in this list.
+
+```typescript
+const { sweeps } = await client.getFuturesSweeps();
+
+sweeps.forEach(s => {
+  console.log(
+    `Sweep ${s.id}: ${s.status} — $${s.requested_amount.value}`,
+    `(scheduled: ${s.scheduled_time})`,
+  );
+});
+```
+
+---
+
+## cancelPendingFuturesSweep
+
+Cancel the currently pending sweep before it begins processing. Only sweeps in `"PENDING"` status can be cancelled.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `DELETE /api/v3/brokerage/cfm/sweeps` |
+
+No parameters.
+
+**Returns:** `Promise<{ success: boolean }>`.
+
+```typescript
+const { success } = await client.cancelPendingFuturesSweep();
+console.log('Pending sweep cancelled:', success);
+```

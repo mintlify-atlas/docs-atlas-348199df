@@ -1,0 +1,322 @@
+---
+title: "CBInternationalClient API Reference — Institutional Exchange"
+sidebarTitle: "International API"
+description: "Full method reference for CBInternationalClient — Coinbase International Exchange API for institutional trading, portfolio margin, instruments, and order management."
+---
+
+`CBInternationalClient` is the REST client for the [Coinbase International Exchange API](https://docs.cdp.coinbase.com/intx/docs/welcome) — an institutional-grade derivatives platform offering perpetual futures and spot trading. All authenticated requests use HMAC-SHA256 signing with an API key, secret, and passphrase. Public endpoints (assets, instruments, index data) do not require authentication.
+
+## Installation & Setup
+
+```typescript
+import { CBInternationalClient } from 'coinbase-api';
+
+const client = new CBInternationalClient({
+  apiKey: 'YOUR_API_KEY',
+  apiSecret: 'YOUR_API_SECRET',
+  apiPassphrase: 'YOUR_API_PASSPHRASE',
+  // useSandbox: true, // Connects to https://api-n5e1.coinbase.com
+});
+```
+
+<Note>
+  The sandbox REST base URL is `https://api-n5e1.coinbase.com`. The production REST base URL is `https://api.international.coinbase.com`. Pass `useSandbox: true` to the constructor to use the sandbox automatically.
+</Note>
+
+---
+
+## All Methods
+
+| Method | Auth | HTTP | Endpoint |
+|--------|:----:|:----:|----------|
+| **Assets** | | | |
+| `getAssets()` | — | GET | `/api/v1/assets` |
+| `getAssetDetails()` | — | GET | `/api/v1/assets/{asset}` |
+| `getSupportedNetworksPerAsset()` | — | GET | `/api/v1/assets/{asset}/networks` |
+| **Index** | | | |
+| `getIndexComposition()` | — | GET | `/api/v1/index/{index}/composition` |
+| `getIndexCompositionHistory()` | — | GET | `/api/v1/index/{index}/composition-history` |
+| `getIndexPrice()` | — | GET | `/api/v1/index/{index}/price` |
+| `getIndexCandles()` | — | GET | `/api/v1/index/{index}/candles` |
+| **Instruments** | | | |
+| `getInstruments()` | — | GET | `/api/v1/instruments` |
+| `getInstrumentDetails()` | — | GET | `/api/v1/instruments/{instrument}` |
+| `getQuotePerInstrument()` | — | GET | `/api/v1/instruments/{instrument}/quote` |
+| `getDailyTradingVolumes()` | — | GET | `/api/v1/instruments/volumes/daily` |
+| `getAggregatedCandlesData()` | — | GET | `/api/v1/instruments/{instrument}/candles` |
+| `getHistoricalFundingRates()` | — | GET | `/api/v1/instruments/{instrument}/funding` |
+| **Position Offsets** | | | |
+| `getPositionOffsets()` | — | GET | `/api/v1/position-offsets` |
+| **Orders** | | | |
+| `submitOrder()` | 🔒 | POST | `/api/v1/orders` |
+| `getOpenOrders()` | 🔒 | GET | `/api/v1/orders` |
+| `cancelOrders()` | 🔒 | DELETE | `/api/v1/orders` |
+| `updateOpenOrder()` | 🔒 | PUT | `/api/v1/orders/{id}` |
+| `getOrderDetails()` | 🔒 | GET | `/api/v1/orders/{id}` |
+| `cancelOrder()` | 🔒 | DELETE | `/api/v1/orders/{id}` |
+| **Portfolios** | | | |
+| `getUserPortfolios()` | 🔒 | GET | `/api/v1/portfolios` |
+| `createPortfolio()` | 🔒 | POST | `/api/v1/portfolios` |
+| `updatePortfolioParameters()` | 🔒 | PATCH | `/api/v1/portfolios` |
+| `getUserPortfolio()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}` |
+| `updatePortfolio()` | 🔒 | PUT | `/api/v1/portfolios/{portfolio}` |
+| `getPortfolioDetails()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/detail` |
+| `getPortfolioSummary()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/summary` |
+| `getPortfolioBalances()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/balances` |
+| `getBalanceForPortfolioAsset()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/balances/{asset}` |
+| `getActiveLoansForPortfolio()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/loans` |
+| `getLoanInfoForPortfolioAsset()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/loans/{asset}` |
+| `acquireOrRepayLoan()` | 🔒 | POST | `/api/v1/portfolios/{portfolio}/loans/{asset}` |
+| `previewLoanUpdate()` | 🔒 | POST | `/api/v1/portfolios/{portfolio}/loans/{asset}/preview` |
+| `getMaxLoanAvailability()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/loans/{asset}/availability` |
+| `getPortfolioPositions()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/positions` |
+| `getPositionForPortfolioInstrument()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/positions/{instrument}` |
+| `getTotalOpenPositionLimit()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/position-limits` |
+| `getOpenPositionLimitsForAllInstruments()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/position-limits/positions` |
+| `getOpenPositionLimitsForInstrument()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/position-limits/positions/{instrument}` |
+| `getFillsByPortfolios()` | 🔒 | GET | `/api/v1/portfolios/fills` |
+| `getPortfolioFills()` | 🔒 | GET | `/api/v1/portfolios/{portfolio}/fills` |
+| `setCrossCollateral()` | 🔒 | POST | `/api/v1/portfolios/{portfolio}/cross-collateral-enabled` |
+| `setAutoMargin()` | 🔒 | POST | `/api/v1/portfolios/{portfolio}/auto-margin-enabled` |
+| `setPortfolioMarginOverride()` | 🔒 | POST | `/api/v1/portfolios/margin` |
+| `getFundTransferLimit()` | 🔒 | GET | `/api/v1/portfolios/transfer/{portfolio}/{asset}/transfer-limit` |
+| `transferFundsBetweenPortfolios()` | 🔒 | POST | `/api/v1/portfolios/transfer` |
+| `transferPositionsBetweenPortfolios()` | 🔒 | POST | `/api/v1/portfolios/transfer-position` |
+| `getPortfolioFeeRates()` | 🔒 | GET | `/api/v1/portfolios/fee-rates` |
+| **Rankings** | | | |
+| `getRankings()` | 🔒 | GET | `/api/v1/rankings/statistics` |
+| **Transfers** | | | |
+| `getMatchingTransfers()` | 🔒 | GET | `/api/v1/transfers` |
+| `getTransfer()` | 🔒 | GET | `/api/v1/transfers/{transfer_uuid}` |
+| `withdrawToCryptoAddress()` | 🔒 | POST | `/api/v1/transfers/withdraw` |
+| `createCryptoAddress()` | 🔒 | POST | `/api/v1/transfers/address` |
+| `createCounterpartyId()` | 🔒 | POST | `/api/v1/transfers/create-counterparty-id` |
+| `validateCounterpartyId()` | 🔒 | POST | `/api/v1/transfers/validate-counterparty-id` |
+| `getCounterpartyWithdrawalLimit()` | 🔒 | GET | `/api/v1/transfers/withdraw/{portfolio}/{asset}/counterparty-withdrawal-limit` |
+| `withdrawToCounterpartyId()` | 🔒 | POST | `/api/v1/transfers/withdraw/counterparty` |
+| **Fee Rates** | | | |
+| `getFeeRateTiers()` | 🔒 | GET | `/api/v1/fee-rate-tiers` |
+
+---
+
+## Assets
+
+### `getAssets()` / `getAssetDetails(params)` / `getSupportedNetworksPerAsset(params)`
+
+Public endpoints returning asset information and supported deposit/withdrawal networks.
+
+```typescript
+const assets = await client.getAssets();
+const btcDetails = await client.getAssetDetails({ asset: 'BTC' });
+const networks = await client.getSupportedNetworksPerAsset({ asset: 'BTC' });
+```
+
+---
+
+## Index
+
+### `getIndexComposition(params)`
+
+Returns the current composition of a Coinbase International index, including weighted constituent assets.
+
+<ParamField query="index" type="string" required>Index symbol, e.g. `"COIN50"`.</ParamField>
+
+### `getIndexCandles(params)`
+
+Returns daily OHLC data for an index in descending time order.
+
+<ParamField query="index" type="string" required>Index symbol.</ParamField>
+<ParamField query="granularity" type="string">Time granularity of candles.</ParamField>
+<ParamField query="start" type="string">ISO 8601 start time.</ParamField>
+<ParamField query="end" type="string">ISO 8601 end time.</ParamField>
+
+```typescript
+const candles = await client.getIndexCandles({
+  index: 'COIN50',
+  granularity: 'ONE_DAY',
+  start: '2025-01-01T00:00:00Z',
+  end: '2025-01-31T00:00:00Z',
+});
+```
+
+---
+
+## Instruments
+
+### `getInstruments()` / `getInstrumentDetails(params)` / `getQuotePerInstrument(params)`
+
+```typescript
+const instruments = await client.getInstruments();
+const details = await client.getInstrumentDetails({ instrument: 'BTC-PERP' });
+const quote = await client.getQuotePerInstrument({ instrument: 'BTC-PERP' });
+console.log(quote.best_bid, quote.best_ask);
+```
+
+### `getAggregatedCandlesData(params)`
+
+Returns OHLCV candlestick data for a specific instrument.
+
+<ParamField query="instrument" type="string" required>Instrument symbol, e.g. `"BTC-PERP"`.</ParamField>
+<ParamField query="granularity" type="string" required>Candle size: `"ONE_MIN"`, `"FIVE_MIN"`, `"FIFTEEN_MIN"`, `"THIRTY_MIN"`, `"ONE_HOUR"`, `"TWO_HOUR"`, `"FOUR_HOUR"`, `"ONE_DAY"`.</ParamField>
+<ParamField query="start" type="string">ISO 8601 start time.</ParamField>
+<ParamField query="end" type="string">ISO 8601 end time.</ParamField>
+
+```typescript
+const candles = await client.getAggregatedCandlesData({
+  instrument: 'BTC-PERP',
+  granularity: 'ONE_HOUR',
+  start: '2025-01-01T00:00:00Z',
+  end: '2025-01-02T00:00:00Z',
+});
+```
+
+### `getHistoricalFundingRates(params)`
+
+Returns funding rate history for a perpetual futures instrument.
+
+```typescript
+const rates = await client.getHistoricalFundingRates({
+  instrument: 'BTC-PERP',
+  result_limit: 100,
+  result_offset: 0,
+});
+```
+
+---
+
+## Orders
+
+### `submitOrder(params)`
+
+Creates a new order. A `client_order_id` is auto-generated if not provided.
+
+<ParamField body="portfolio" type="string" required>Portfolio UUID.</ParamField>
+<ParamField body="instrument" type="string" required>Instrument symbol, e.g. `"BTC-PERP"`.</ParamField>
+<ParamField body="side" type="string" required>`"BUY"` or `"SELL"`.</ParamField>
+<ParamField body="size" type="string" required>Order size in base currency.</ParamField>
+<ParamField body="type" type="string" required>`"LIMIT"`, `"MARKET"`, or `"STOP_LIMIT"`.</ParamField>
+<ParamField body="price" type="string">Limit price. Required for `LIMIT` orders.</ParamField>
+<ParamField body="client_order_id" type="string">Client-generated UUID for idempotency.</ParamField>
+<ParamField body="tif" type="string">Time-in-force: `"GTC"`, `"IOC"`, `"FOK"`, `"GTD"`.</ParamField>
+
+```typescript
+const order = await client.submitOrder({
+  portfolio: 'portfolio-uuid',
+  instrument: 'BTC-PERP',
+  side: 'BUY',
+  size: '0.1',
+  type: 'LIMIT',
+  price: '60000',
+  tif: 'GTC',
+});
+console.log(order.order_id, order.status);
+```
+
+### `getOpenOrders(params?)` / `cancelOrders(params)` / `cancelOrder(params)`
+
+```typescript
+// List open orders for a portfolio
+const openOrders = await client.getOpenOrders({ portfolio: 'portfolio-uuid' });
+
+// Cancel all orders matching criteria
+await client.cancelOrders({
+  portfolio: 'portfolio-uuid',
+  instrument: 'BTC-PERP',
+});
+
+// Cancel a specific order
+await client.cancelOrder({ id: 'order-uuid', portfolio: 'portfolio-uuid' });
+```
+
+### `updateOpenOrder(params)`
+
+Modifies size and/or price of an existing open order.
+
+<ParamField body="id" type="string" required>Order UUID to modify.</ParamField>
+<ParamField body="size" type="string">New order size.</ParamField>
+<ParamField body="price" type="string">New limit price.</ParamField>
+<ParamField body="stop_price" type="string">New stop trigger price.</ParamField>
+
+---
+
+## Portfolios
+
+### `getUserPortfolios()` / `getUserPortfolio(params)` / `getPortfolioDetails(params)`
+
+```typescript
+const portfolios = await client.getUserPortfolios();
+
+const portfolio = await client.getUserPortfolio({ portfolio: 'portfolio-uuid' });
+
+// Detailed snapshot: summary + positions + balances
+const details = await client.getPortfolioDetails({ portfolio: 'portfolio-uuid' });
+```
+
+### `getPortfolioBalances(params)` / `getPortfolioPositions(params)`
+
+```typescript
+const balances = await client.getPortfolioBalances({ portfolio: 'portfolio-uuid' });
+const positions = await client.getPortfolioPositions({ portfolio: 'portfolio-uuid' });
+```
+
+### `getPortfolioFills(params)`
+
+Returns completed trade fills for a portfolio.
+
+<ParamField query="portfolio" type="string" required>Portfolio UUID.</ParamField>
+<ParamField query="instrument" type="string">Filter by instrument.</ParamField>
+<ParamField query="time_from" type="string">ISO 8601 start time.</ParamField>
+<ParamField query="time_to" type="string">ISO 8601 end time.</ParamField>
+
+### `setAutoMargin(params)` / `setCrossCollateral(params)`
+
+```typescript
+// Enable auto-margin posting
+await client.setAutoMargin({ portfolio: 'portfolio-uuid', enabled: true });
+
+// Enable non-USDC assets as collateral
+await client.setCrossCollateral({ portfolio: 'portfolio-uuid', enabled: true });
+```
+
+---
+
+## Transfers
+
+### `transferFundsBetweenPortfolios(params)`
+
+Moves assets between portfolios owned by the same entity.
+
+<ParamField body="from" type="string" required>Source portfolio UUID.</ParamField>
+<ParamField body="to" type="string" required>Destination portfolio UUID.</ParamField>
+<ParamField body="asset" type="string" required>Asset code, e.g. `"USDC"`.</ParamField>
+<ParamField body="amount" type="string" required>Amount to transfer.</ParamField>
+
+```typescript
+await client.transferFundsBetweenPortfolios({
+  from: 'portfolio-a-uuid',
+  to: 'portfolio-b-uuid',
+  asset: 'USDC',
+  amount: '10000',
+});
+```
+
+### `withdrawToCryptoAddress(params)` / `withdrawToCounterpartyId(params)`
+
+```typescript
+// Withdraw to an external on-chain address
+await client.withdrawToCryptoAddress({
+  portfolio: 'portfolio-uuid',
+  asset: 'BTC',
+  amount: '0.5',
+  address: 'bc1q...',
+  network_arn_id: 'networks:BTC:mainnet',
+});
+
+// Withdraw to another Coinbase institution via counterparty ID
+await client.withdrawToCounterpartyId({
+  portfolio: 'portfolio-uuid',
+  asset: 'USDC',
+  amount: '5000',
+  counterparty_id: 'CBINTL-XXXXXX',
+});
+```

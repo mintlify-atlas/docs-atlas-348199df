@@ -1,0 +1,328 @@
+---
+title: "CBExchangeClient: Professional Trading on Coinbase Exchange"
+sidebarTitle: "Exchange"
+description: "CBExchangeClient provides full access to the Coinbase Exchange (pro) API — accounts, orders, fills, transfers, profiles, and market data."
+---
+
+`CBExchangeClient` targets the [Coinbase Exchange API](https://docs.cdp.coinbase.com/exchange/docs/welcome) — the professional trading platform (formerly Coinbase Pro). It exposes deep order book access, profile-based account management, full order lifecycle control, fiat and crypto transfers, currency conversions, and reporting.
+
+<Note>
+  Coinbase Exchange uses **API key + secret + passphrase** authentication — not JWT. You must supply all three credentials when constructing the client.
+</Note>
+
+## Installation
+
+```bash
+npm install coinbase-api
+```
+
+## Instantiation
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { CBExchangeClient } from 'coinbase-api';
+
+    const client = new CBExchangeClient({
+      apiKey: 'your_api_key',
+      apiSecret: 'your_api_secret',
+      apiPassphrase: 'your_api_passphrase',
+    });
+
+    // Connect to the sandbox environment instead:
+    const sandboxClient = new CBExchangeClient({
+      apiKey: 'sandbox_key',
+      apiSecret: 'sandbox_secret',
+      apiPassphrase: 'sandbox_passphrase',
+      useSandbox: true,
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const { CBExchangeClient } = require('coinbase-api');
+
+    const client = new CBExchangeClient({
+      apiKey: 'your_api_key',
+      apiSecret: 'your_api_secret',
+      apiPassphrase: 'your_api_passphrase',
+    });
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Set `useSandbox: true` to use the Exchange sandbox at `https://api-public.sandbox.exchange.coinbase.com`. This is ideal for testing order flows without real funds.
+</Tip>
+
+---
+
+## Accounts
+
+Trading accounts are separate from your Coinbase.com wallet accounts. Each account holds a single currency balance.
+
+| Method | Description |
+|---|---|
+| `getAccounts()` | List all trading accounts for the current profile |
+| `getAccount(params)` | Get a single account by ID |
+| `getAccountHolds(params)` | List holds on an account (open orders, withdrawals) |
+| `getAccountLedger(params)` | Get ledger entries — trades, fees, transfers, conversions |
+| `getAccountTransfers(params)` | List past deposits and withdrawals for an account |
+
+```typescript
+// All accounts for the authenticated profile
+const accounts = await client.getAccounts();
+
+// Holds on the BTC account
+const holds = await client.getAccountHolds({
+  account_id: 'btc-account-id',
+  limit: 100,
+});
+
+// Ledger entries for the past day (default) or a custom range
+const ledger = await client.getAccountLedger({
+  account_id: 'usd-account-id',
+  start_date: '2024-01-01T00:00:00Z',
+  end_date: '2024-01-31T23:59:59Z',
+});
+```
+
+---
+
+## Address Book
+
+Manage trusted external withdrawal addresses.
+
+| Method | Description |
+|---|---|
+| `getAddressBook()` | Get all stored trusted addresses |
+| `addAddresses(params)` | Add new addresses to the address book |
+| `deleteAddress(params)` | Remove an address by ID |
+
+```typescript
+const book = await client.getAddressBook();
+
+await client.addAddresses({
+  addresses: [{ address: '0xYourEthAddress', currency: 'ETH', label: 'Hot wallet' }],
+});
+```
+
+---
+
+## Coinbase Wallets
+
+Link your Coinbase.com wallets for easy fund deposits into your Exchange trading accounts.
+
+| Method | Description |
+|---|---|
+| `getCoinbaseWallets()` | List all linked Coinbase.com wallets |
+| `createNewCryptoAddress(params)` | Generate a one-time deposit address |
+
+```typescript
+const wallets = await client.getCoinbaseWallets();
+
+const address = await client.createNewCryptoAddress({
+  account_id: 'coinbase-wallet-id',
+});
+```
+
+---
+
+## Currency Conversion
+
+Convert between currencies within a profile (e.g. USD ↔ USDC).
+
+| Method | Description |
+|---|---|
+| `convertCurrency(params)` | Convert funds between currencies |
+| `getConversionFeeRates()` | Get current fee rates and 30-day volumes |
+| `getConversion(params)` | Get details for a specific conversion |
+| `getAllConversions(params)` | List all conversions for a profile |
+
+```typescript
+const conversion = await client.convertCurrency({
+  from: 'USD',
+  to: 'USDC',
+  amount: '100',
+  profile_id: 'your-profile-id',
+});
+
+const fees = await client.getConversionFeeRates();
+```
+
+---
+
+## Orders
+
+<Warning>
+  `submitOrder()` automatically validates and assigns a unique `client_oid` if not provided. The `cancelAllOrders()` method is best-effort — you may need to call it multiple times to cancel all open orders.
+</Warning>
+
+| Method | Description |
+|---|---|
+| `getOrders(params?)` | List open (or filtered) orders |
+| `submitOrder(params)` | Place a new limit or market order |
+| `cancelAllOrders(params?)` | Cancel all open orders (best effort) |
+| `cancelOrder(params)` | Cancel a single order by ID |
+| `getFills(params?)` | List recent fills |
+| `getOrder(params)` | Get a single order by ID |
+
+<CodeGroup>
+  ```typescript Place a limit order
+  const order = await client.submitOrder({
+    product_id: 'BTC-USD',
+    side: 'buy',
+    type: 'limit',
+    price: '30000',
+    size: '0.001',
+  });
+  ```
+
+  ```typescript Place a market order
+  const market = await client.submitOrder({
+    product_id: 'ETH-USD',
+    side: 'sell',
+    type: 'market',
+    size: '0.1',
+  });
+  ```
+
+  ```typescript List open orders
+  const open = await client.getOrders({
+    product_id: 'BTC-USD',
+    status: 'open',
+  });
+  ```
+
+  ```typescript Get fills
+  const fills = await client.getFills({
+    product_id: 'BTC-USD',
+    limit: 100,
+  });
+  ```
+
+  ```typescript Cancel a single order
+  await client.cancelOrder({
+    order_id: 'order-uuid',
+    product_id: 'BTC-USD',
+  });
+  ```
+</CodeGroup>
+
+---
+
+## Products & Market Data
+
+Product endpoints are **public** — no authentication required.
+
+| Method | Description |
+|---|---|
+| `getAllTradingPairs(params?)` | List all currency pairs |
+| `getProduct(params)` | Get a single product |
+| `getProductBook(params)` | Get the order book (level 1, 2, or 3) |
+| `getProductCandles(params)` | Get OHLCV candlestick data |
+| `getProductStats(params)` | Get 30-day and 24-hour stats |
+| `getProductTicker(params)` | Get best bid/ask and 24h volume snapshot |
+| `getProductTrades(params)` | Get the latest trades |
+
+```typescript
+// No auth needed for product endpoints
+const products = await client.getAllTradingPairs();
+
+const book = await client.getProductBook({
+  product_id: 'BTC-USD',
+  level: 2,
+});
+
+const candles = await client.getProductCandles({
+  product_id: 'BTC-USD',
+  granularity: 3600,
+  start: '2024-01-01T00:00:00Z',
+  end: '2024-01-02T00:00:00Z',
+});
+
+const ticker = await client.getProductTicker({ product_id: 'ETH-USD' });
+```
+
+---
+
+## Profiles
+
+Profiles are isolated sub-accounts within your Exchange account — each with its own balances and order history.
+
+| Method | Description |
+|---|---|
+| `getProfiles(params?)` | List all profiles |
+| `createProfile(params)` | Create a new profile |
+| `transferFundsBetweenProfiles(params)` | Move funds between profiles |
+| `getProfileById(params)` | Get a profile by ID |
+| `renameProfile(params)` | Rename a profile |
+| `deleteProfile(params)` | Delete a profile (transfers all funds to target) |
+
+```typescript
+const profiles = await client.getProfiles({ active: true });
+
+await client.transferFundsBetweenProfiles({
+  from: 'source-profile-id',
+  to: 'target-profile-id',
+  currency: 'USD',
+  amount: '500',
+});
+```
+
+---
+
+## Transfers
+
+Move funds in and out of your Exchange trading accounts via Coinbase wallets or linked payment methods.
+
+| Method | Description |
+|---|---|
+| `depositFromCoinbaseAccount(params)` | Deposit from a Coinbase.com wallet |
+| `depositFromPaymentMethod(params)` | Deposit from a linked payment method |
+| `withdrawToCoinbaseAccount(params)` | Withdraw to a Coinbase.com wallet |
+| `withdrawToCryptoAddress(params)` | Withdraw to an external crypto address |
+| `withdrawToPaymentMethod(params)` | Withdraw to a linked payment method |
+| `getTransfers(params?)` | List all transfers |
+| `getTransfer(params)` | Get a single transfer |
+| `getCryptoWithdrawalFeeEstimate(params)` | Estimate fees for a crypto withdrawal |
+
+```typescript
+// Deposit from a linked Coinbase wallet
+await client.depositFromCoinbaseAccount({
+  amount: '0.1',
+  currency: 'BTC',
+  coinbase_account_id: 'coinbase-wallet-uuid',
+  profile_id: 'trading-profile-id',
+});
+
+// Withdraw to an external address
+await client.withdrawToCryptoAddress({
+  amount: '0.05',
+  currency: 'ETH',
+  crypto_address: '0xYourEthAddress',
+  profile_id: 'trading-profile-id',
+});
+```
+
+---
+
+## Fees
+
+```typescript
+// Get your current maker/taker fee rates and 30-day trailing volume
+const fees = await client.getFees();
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="International Client" icon="globe" href="/rest/international">
+    Institutional cross-border trading and portfolio margin
+  </Card>
+  <Card title="Advanced Trade Client" icon="chart-line" href="/rest/advanced-trade">
+    Modern retail & institutional trading with JWT auth
+  </Card>
+</CardGroup>

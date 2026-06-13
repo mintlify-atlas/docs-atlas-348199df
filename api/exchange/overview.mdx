@@ -1,0 +1,375 @@
+---
+title: "CBExchangeClient API Reference — Pro Trading Endpoints"
+sidebarTitle: "Exchange API"
+description: "Full method reference for CBExchangeClient — Coinbase Exchange pro trading API covering accounts, orders, fills, transfers, profiles, and market data."
+---
+
+`CBExchangeClient` is the REST client for the [Coinbase Exchange API](https://docs.cdp.coinbase.com/exchange/docs/welcome) — the institutional-grade trading platform (formerly Coinbase Pro). It covers portfolio accounts, order management, fills, transfers, profiles, reports, lending, and market data. Most endpoints require authentication with an API key, secret, and passphrase.
+
+## Installation & Setup
+
+```typescript
+import { CBExchangeClient } from 'coinbase-api';
+
+const client = new CBExchangeClient({
+  apiKey: 'YOUR_API_KEY',
+  apiSecret: 'YOUR_API_SECRET',
+  apiPassphrase: 'YOUR_API_PASSPHRASE',
+  // useSandbox: true, // Uncomment to use the sandbox environment
+});
+```
+
+<Note>
+  The Exchange API uses HMAC-SHA256 signing with a `apiKey`, `apiSecret`, and `apiPassphrase`. A sandbox is available at `https://api-public.sandbox.exchange.coinbase.com`.
+</Note>
+
+---
+
+## All Methods
+
+| Method | Auth | HTTP | Endpoint |
+|--------|:----:|:----:|----------|
+| **Accounts** | | | |
+| `getAccounts()` | 🔒 | GET | `/accounts` |
+| `getAccount()` | 🔒 | GET | `/accounts/{account_id}` |
+| `getAccountHolds()` | 🔒 | GET | `/accounts/{account_id}/holds` |
+| `getAccountLedger()` | 🔒 | GET | `/accounts/{account_id}/ledger` |
+| `getAccountTransfers()` | 🔒 | GET | `/accounts/{account_id}/transfers` |
+| **Address Book** | | | |
+| `getAddressBook()` | 🔒 | GET | `/address-book` |
+| `addAddresses()` | 🔒 | POST | `/address-book` |
+| `deleteAddress()` | 🔒 | DELETE | `/address-book/{id}` |
+| **Coinbase Wallets** | | | |
+| `getCoinbaseWallets()` | 🔒 | GET | `/coinbase-accounts` |
+| `createNewCryptoAddress()` | 🔒 | POST | `/coinbase-accounts/{account_id}/addresses` |
+| **Conversions** | | | |
+| `convertCurrency()` | 🔒 | POST | `/conversions` |
+| `getConversionFeeRates()` | 🔒 | GET | `/conversions/fees` |
+| `getConversion()` | 🔒 | GET | `/conversions/{conversion_id}` |
+| `getAllConversions()` | 🔒 | GET | `/conversions` |
+| **Currencies** | | | |
+| `getCurrencies()` | — | GET | `/currencies` |
+| `getCurrency()` | — | GET | `/currencies/{currency_id}` |
+| **Deposits** | | | |
+| `depositFromCoinbaseAccount()` | 🔒 | POST | `/deposits/coinbase-account` |
+| `depositFromPaymentMethod()` | 🔒 | POST | `/deposits/payment-method` |
+| `getPaymentMethods()` | 🔒 | GET | `/payment-methods` |
+| **Transfers** | | | |
+| `getTransfers()` | 🔒 | GET | `/transfers` |
+| `getTransfer()` | 🔒 | GET | `/transfers/{transfer_id}` |
+| `submitTravelInformation()` | 🔒 | POST | `/transfers/{transfer_id}/travel-rules` |
+| `withdrawToCoinbaseAccount()` | 🔒 | POST | `/withdrawals/coinbase-account` |
+| `withdrawToCryptoAddress()` | 🔒 | POST | `/withdrawals/crypto` |
+| `getCryptoWithdrawalFeeEstimate()` | 🔒 | GET | `/withdrawals/fee-estimate` |
+| `withdrawToPaymentMethod()` | 🔒 | POST | `/withdrawals/payment-method` |
+| **Fees** | | | |
+| `getFees()` | 🔒 | GET | `/fees` |
+| **Orders & Fills** | | | |
+| `getFills()` | 🔒 | GET | `/fills` |
+| `getOrders()` | 🔒 | GET | `/orders` |
+| `cancelAllOrders()` | 🔒 | DELETE | `/orders` |
+| `submitOrder()` | 🔒 | POST | `/orders` |
+| `getOrder()` | 🔒 | GET | `/orders/{order_id}` |
+| `cancelOrder()` | 🔒 | DELETE | `/orders/{order_id}` |
+| **Loans** | | | |
+| `getLoans()` | 🔒 | GET | `/loans` |
+| `getLoanAssets()` | 🔒 | GET | `/loans/assets` |
+| `getInterestSummaries()` | 🔒 | GET | `/loans/interest` |
+| `getInterestRateHistory()` | 🔒 | GET | `/loans/interest/history/{loan_id}` |
+| `getInterestCharges()` | 🔒 | GET | `/loans/interest/{loan_id}` |
+| `getLendingOverview()` | 🔒 | GET | `/loans/lending-overview` |
+| `getNewLoanPreview()` | 🔒 | GET | `/loans/loan-preview` |
+| `submitNewLoan()` | 🔒 | POST | `/loans/open` |
+| `getNewLoanOptions()` | 🔒 | GET | `/loans/options` |
+| `repayLoanInterest()` | 🔒 | POST | `/loans/repay-interest` |
+| `repayLoanPrincipal()` | 🔒 | POST | `/loans/repay-principal` |
+| `getPrincipalRepaymentPreview()` | 🔒 | GET | `/loans/repayment-preview` |
+| **Oracle** | | | |
+| `getSignedPrices()` | 🔒 | GET | `/oracle` |
+| **Products** | | | |
+| `getAllTradingPairs()` | — | GET | `/products` |
+| `getAllProductVolume()` | — | GET | `/products/volume-summary` |
+| `getProduct()` | — | GET | `/products/{product_id}` |
+| `getProductBook()` | — | GET | `/products/{product_id}/book` |
+| `getProductCandles()` | — | GET | `/products/{product_id}/candles` |
+| `getProductStats()` | — | GET | `/products/{product_id}/stats` |
+| `getProductTicker()` | — | GET | `/products/{product_id}/ticker` |
+| `getProductTrades()` | — | GET | `/products/{product_id}/trades` |
+| **Profiles** | | | |
+| `getProfiles()` | 🔒 | GET | `/profiles` |
+| `createProfile()` | 🔒 | POST | `/profiles` |
+| `transferFundsBetweenProfiles()` | 🔒 | POST | `/profiles/transfer` |
+| `getProfileById()` | 🔒 | GET | `/profiles/{profile_id}` |
+| `renameProfile()` | 🔒 | PUT | `/profiles/{profile_id}` |
+| `deleteProfile()` | 🔒 | PUT | `/profiles/{profile_id}/deactivate` |
+| **Reports** | | | |
+| `getAllReports()` | 🔒 | GET | `/reports` |
+| `createReport()` | 🔒 | POST | `/reports` |
+| `getReport()` | 🔒 | GET | `/reports/{report_id}` |
+| **Travel Rules** | | | |
+| `getTravelRuleInformation()` | 🔒 | GET | `/travel-rules` |
+| `createTravelRuleEntry()` | 🔒 | POST | `/travel-rules` |
+| `deleteTravelRuleEntry()` | 🔒 | DELETE | `/travel-rules/{id}` |
+| **Users** | | | |
+| `getUserExchangeLimits()` | 🔒 | GET | `/users/{user_id}/exchange-limits` |
+| `updateSettlementPreference()` | 🔒 | POST | `/users/{user_id}/settlement-preferences` |
+| `getUserTradingVolume()` | 🔒 | GET | `/users/{user_id}/trading-volumes` |
+| **Wrapped Assets** | | | |
+| `getAllWrappedAssets()` | — | GET | `/wrapped-assets` |
+| `getAllStakeWraps()` | 🔒 | GET | `/wrapped-assets/stake-wrap` |
+| `createStakeWrap()` | 🔒 | POST | `/wrapped-assets/stake-wrap` |
+| `getStakeWrap()` | 🔒 | GET | `/wrapped-assets/stake-wrap/{stake_wrap_id}` |
+| `getWrappedAssetDetails()` | 🔒 | GET | `/wrapped-assets/{wrapped_asset_id}` |
+| `getWrappedAssetConversionRate()` | 🔒 | GET | `/wrapped-assets/{wrapped_asset_id}/conversion-rate` |
+
+---
+
+## Accounts
+
+### `getAccounts()`
+
+Returns all trading accounts for the authenticated profile. Trading accounts are distinct from your Coinbase.com wallet accounts.
+
+```typescript
+const accounts = await client.getAccounts();
+// [{ id, currency, balance, available, hold, profile_id }, ...]
+```
+
+### `getAccountHolds(params)`
+
+Lists active holds on an account. Holds are placed on open orders and pending withdrawals.
+
+<ParamField query="account_id" type="string" required>Account UUID.</ParamField>
+<ParamField query="before" type="string">Pagination cursor.</ParamField>
+<ParamField query="after" type="string">Pagination cursor.</ParamField>
+<ParamField query="limit" type="number">Max results per page (default 100).</ParamField>
+
+### `getAccountLedger(params)`
+
+Lists all balance-affecting events for an account: trades, transfers, fees, rebates, and conversions.
+
+```typescript
+const ledger = await client.getAccountLedger({
+  account_id: 'account-uuid',
+  start_date: '2025-01-01',
+  end_date: '2025-01-31',
+});
+```
+
+---
+
+## Orders
+
+### `submitOrder(params)`
+
+Places a new limit or market order. Account funds are held for the duration of the order.
+
+<ParamField body="product_id" type="string" required>
+  Trading pair, e.g. `"BTC-USD"`.
+</ParamField>
+<ParamField body="side" type="string" required>
+  `"buy"` or `"sell"`.
+</ParamField>
+<ParamField body="type" type="string" required>
+  `"limit"`, `"market"`, or `"stop"`.
+</ParamField>
+<ParamField body="size" type="string">
+  Amount in base currency. Required for limit orders and market sells.
+</ParamField>
+<ParamField body="price" type="string">
+  Limit price. Required for limit orders.
+</ParamField>
+<ParamField body="funds" type="string">
+  Quoted currency amount. Used for market buys instead of `size`.
+</ParamField>
+<ParamField body="client_oid" type="string">
+  Client-generated UUID for idempotency. Auto-generated if not supplied.
+</ParamField>
+<ParamField body="stop" type="string">
+  `"loss"` or `"entry"` for stop orders.
+</ParamField>
+<ParamField body="stop_price" type="string">
+  Trigger price for stop orders.
+</ParamField>
+<ParamField body="time_in_force" type="string">
+  `"GTC"`, `"GTT"`, `"IOC"`, or `"FOK"`. Defaults to `"GTC"`.
+</ParamField>
+<ParamField body="post_only" type="boolean">
+  If `true`, cancels the order if it would immediately fill (maker only).
+</ParamField>
+<ParamField body="profile_id" type="string">
+  Profile to place order in. Defaults to the default profile.
+</ParamField>
+
+```typescript
+// Limit buy 0.01 BTC at $60,000
+const order = await client.submitOrder({
+  product_id: 'BTC-USD',
+  side: 'buy',
+  type: 'limit',
+  price: '60000.00',
+  size: '0.01',
+  time_in_force: 'GTC',
+});
+console.log(order.id, order.status);
+
+// Market sell $500 worth of BTC
+const marketOrder = await client.submitOrder({
+  product_id: 'BTC-USD',
+  side: 'sell',
+  type: 'market',
+  funds: '500.00',
+});
+```
+
+### `getOrders(params?)`
+
+Lists open orders. Only open or un-settled orders are returned by default.
+
+```typescript
+const orders = await client.getOrders({
+  product_id: 'ETH-USD',
+  status: 'open',
+});
+```
+
+### `cancelAllOrders(params?)` / `cancelOrder(params)`
+
+```typescript
+// Cancel all open orders on a product
+await client.cancelAllOrders({ product_id: 'BTC-USD' });
+
+// Cancel a specific order
+await client.cancelOrder({ order_id: 'order-uuid', product_id: 'BTC-USD' });
+```
+
+### `getFills(params?)`
+
+Returns recent trade executions (partial and complete fills) for the API key's profile.
+
+<ParamField query="order_id" type="string">Filter fills by order ID.</ParamField>
+<ParamField query="product_id" type="string">Filter fills by trading pair.</ParamField>
+<ParamField query="start_sequence_timestamp" type="string">ISO 8601 start time.</ParamField>
+<ParamField query="end_sequence_timestamp" type="string">ISO 8601 end time.</ParamField>
+
+```typescript
+const fills = await client.getFills({ product_id: 'BTC-USD' });
+```
+
+---
+
+## Products
+
+### `getAllTradingPairs(params?)` / `getProduct(params)`
+
+```typescript
+const products = await client.getAllTradingPairs();
+const btcUsd = await client.getProduct({ product_id: 'BTC-USD' });
+```
+
+### `getProductBook(params)`
+
+Returns the order book for a product. Use `level` to control depth: `1` (best bid/ask only), `2` (top 50 aggregated), `3` (full order book, authenticated only).
+
+```typescript
+const book = await client.getProductBook({ product_id: 'BTC-USD', level: 2 });
+```
+
+### `getProductCandles(params)`
+
+Returns historical OHLCV candles. Each candle is `[timestamp, low, high, open, close, volume]`.
+
+<ParamField query="product_id" type="string" required>Trading pair.</ParamField>
+<ParamField query="start" type="string" required>ISO 8601 start time.</ParamField>
+<ParamField query="end" type="string" required>ISO 8601 end time.</ParamField>
+<ParamField query="granularity" type="number" required>
+  Candle size in seconds. Allowed values: `60`, `300`, `900`, `3600`, `21600`, `86400`.
+</ParamField>
+
+```typescript
+const candles = await client.getProductCandles({
+  product_id: 'BTC-USD',
+  start: '2025-01-01T00:00:00Z',
+  end: '2025-01-02T00:00:00Z',
+  granularity: 3600,
+});
+```
+
+---
+
+## Transfers
+
+### `withdrawToCryptoAddress(params)`
+
+Withdraws funds from a profile to an external crypto wallet.
+
+<ParamField body="amount" type="string" required>Amount to withdraw.</ParamField>
+<ParamField body="currency" type="string" required>Currency code, e.g. `"BTC"`.</ParamField>
+<ParamField body="crypto_address" type="string" required>Destination wallet address.</ParamField>
+<ParamField body="profile_id" type="string">Source profile ID.</ParamField>
+<ParamField body="destination_tag" type="string">Required for currencies like XRP.</ParamField>
+<ParamField body="no_destination_tag" type="boolean">Set to `true` to confirm intentional omission of destination tag.</ParamField>
+
+```typescript
+const result = await client.withdrawToCryptoAddress({
+  amount: '0.05',
+  currency: 'BTC',
+  crypto_address: 'bc1qexample...',
+  profile_id: 'your-profile-id',
+});
+```
+
+### `depositFromCoinbaseAccount(params)`
+
+Moves funds from a Coinbase.com wallet into your Exchange trading account.
+
+```typescript
+await client.depositFromCoinbaseAccount({
+  amount: '1000.00',
+  currency: 'USD',
+  coinbase_account_id: 'coinbase-account-uuid',
+  profile_id: 'exchange-profile-id',
+});
+```
+
+---
+
+## Profiles
+
+### `getProfiles(params?)` / `createProfile(params)`
+
+```typescript
+const profiles = await client.getProfiles({ active: true });
+const newProfile = await client.createProfile({ name: 'Algo Trading' });
+```
+
+### `transferFundsBetweenProfiles(params)`
+
+Moves an amount of currency between two profiles within the same account.
+
+<ParamField body="from" type="string" required>Source profile ID.</ParamField>
+<ParamField body="to" type="string" required>Destination profile ID.</ParamField>
+<ParamField body="currency" type="string" required>Currency to transfer.</ParamField>
+<ParamField body="amount" type="string" required>Amount to transfer.</ParamField>
+
+```typescript
+await client.transferFundsBetweenProfiles({
+  from: 'profile-a-uuid',
+  to: 'profile-b-uuid',
+  currency: 'USD',
+  amount: '500.00',
+});
+```
+
+---
+
+## Wrapped Assets
+
+### `getAllWrappedAssets()` / `getWrappedAssetDetails(params)` / `getWrappedAssetConversionRate(params)`
+
+```typescript
+const assets = await client.getAllWrappedAssets();
+const details = await client.getWrappedAssetDetails({ wrapped_asset_id: 'CBETH' });
+const rate = await client.getWrappedAssetConversionRate({ wrapped_asset_id: 'CBETH' });
+console.log(rate.conversion_rate);
+```

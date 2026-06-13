@@ -1,0 +1,446 @@
+---
+title: "Advanced Trade Orders API — Submit, Cancel & Query Orders"
+sidebarTitle: "Orders"
+description: "Place, modify, cancel, and query orders on Coinbase Advanced Trade. Supports market, limit, stop, and bracket orders for spot and futures trading."
+---
+
+The Advanced Trade Orders endpoints cover the full order lifecycle: previewing, submitting, editing, cancelling, and querying historical orders and fills. The `client_order_id` field is optional — if omitted, the SDK automatically generates a unique value prefixed with `cbnode`. Bracket and stop-limit order types are supported alongside standard market and limit orders.
+
+---
+
+## submitOrder
+
+Create a new order. The `order_configuration` field determines the order type and time-in-force. Exactly one configuration key must be provided.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/orders` |
+
+<ParamField body="product_id" type="string" required>
+  The trading pair to trade, e.g. `BTC-USD` or `ETH-USDC`.
+</ParamField>
+
+<ParamField body="side" type="string" required>
+  Order direction. Must be `"BUY"` or `"SELL"`.
+</ParamField>
+
+<ParamField body="order_configuration" type="OrderConfiguration" required>
+  Exactly one order type object. See the configuration types table below.
+</ParamField>
+
+<ParamField body="client_order_id" type="string">
+  A unique client-supplied identifier. The SDK auto-generates one (prefixed `cbnode`) if omitted. Custom values must also start with `cbnode`.
+</ParamField>
+
+<ParamField body="leverage" type="string">
+  Leverage multiplier for margin/futures orders, e.g. `"3"`.
+</ParamField>
+
+<ParamField body="margin_type" type="string">
+  Margin mode for leveraged orders. One of `"CROSS"` or `"ISOLATED"`.
+</ParamField>
+
+<ParamField body="preview_id" type="string">
+  The `preview_id` returned by `previewOrder()` — links this order to a prior preview.
+</ParamField>
+
+### Order configuration types
+
+| Key | Description | Required fields |
+|---|---|---|
+| `market_market_ioc` | Market order, immediate-or-cancel | `base_size` **or** `quote_size` |
+| `limit_limit_gtc` | Limit order, good-till-cancelled | `base_size`, `limit_price` |
+| `limit_limit_gtd` | Limit order, good-till-date | `base_size`, `limit_price`, `end_time` |
+| `limit_limit_fok` | Limit order, fill-or-kill | `base_size`, `limit_price` |
+| `sor_limit_ioc` | SOR limit, immediate-or-cancel | `base_size`, `limit_price` |
+| `stop_limit_stop_limit_gtc` | Stop-limit, good-till-cancelled | `base_size`, `limit_price`, `stop_price`, `stop_direction` |
+| `stop_limit_stop_limit_gtd` | Stop-limit, good-till-date | `base_size`, `limit_price`, `stop_price`, `stop_direction`, `end_time` |
+| `trigger_bracket_gtc` | Bracket order, good-till-cancelled | `base_size`, `limit_price`, `stop_trigger_price` |
+| `trigger_bracket_gtd` | Bracket order, good-till-date | `base_size`, `limit_price`, `stop_trigger_price`, `end_time` |
+| `twap_limit_gtd` | TWAP limit, good-till-date | `quote_size`, `base_size`, `start_time`, `end_time`, `limit_price` |
+
+**Returns:** `Promise<AdvTradeSubmitOrderResponse>` — contains `success` boolean, an optional `success_response` with `order_id`, `product_id`, `side`, and `client_order_id`, and an optional `error_response` on failure.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your-api-key-name',
+  apiSecret: '-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n',
+});
+
+// Place a limit GTC buy order for 0.001 BTC at $60,000
+const result = await client.submitOrder({
+  product_id: 'BTC-USD',
+  side: 'BUY',
+  order_configuration: {
+    limit_limit_gtc: {
+      base_size: '0.001',
+      limit_price: '60000.00',
+      post_only: false,
+    },
+  },
+});
+
+if (result.success) {
+  console.log('Order placed:', result.success_response?.order_id);
+} else {
+  console.error('Order failed:', result.error_response?.message);
+}
+```
+
+---
+
+## cancelOrders
+
+Initiate cancel requests for one or more orders in a single batch call. A maximum of 100 order IDs may be submitted per request.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/orders/batch_cancel` |
+
+<ParamField body="order_ids" type="string[]" required>
+  Array of order IDs to cancel. Maximum 100 entries per request.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeCancelOrdersResponse>` — an object with a `results` array. Each entry contains `order_id`, `success` boolean, and `failure_reason`.
+
+```typescript
+const { results } = await client.cancelOrders({
+  order_ids: [
+    'afe6bb33-7a2a-4aa2-af41-3e9f09428e2b',
+    '11d15534-0b0a-4beb-9e27-a5d2b6b5c5e3',
+  ],
+});
+
+results.forEach(r => {
+  if (r.success) {
+    console.log(`Cancelled: ${r.order_id}`);
+  } else {
+    console.warn(`Failed to cancel ${r.order_id}: ${r.failure_reason}`);
+  }
+});
+```
+
+---
+
+## updateOrder
+
+Edit the price or size of an existing open limit GTC order. Note the queue-position rules: increasing size or changing price moves your order to the back of the queue; decreasing size keeps your place.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/orders/edit` |
+
+<ParamField body="order_id" type="string" required>
+  The ID of the order to edit. Only open limit GTC orders can be edited.
+</ParamField>
+
+<ParamField body="price" type="string">
+  New limit price as a decimal string, e.g. `"62000.00"`.
+</ParamField>
+
+<ParamField body="size" type="string">
+  New base size as a decimal string, e.g. `"0.002"`.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeEditOrderResponse>` — contains `success` boolean, an optional `success_response` with `order_id`, and an optional `error_response` detailing failure reasons.
+
+```typescript
+const edit = await client.updateOrder({
+  order_id: 'afe6bb33-7a2a-4aa2-af41-3e9f09428e2b',
+  price: '61500.00',
+  size: '0.002',
+});
+
+if (edit.success) {
+  console.log('Order updated successfully');
+} else {
+  console.error('Edit failed:', edit.error_response?.edit_order_failure_reason);
+}
+```
+
+---
+
+## updateOrderPreview
+
+Preview the outcome of editing an order — including slippage, new totals, and best bid/ask — before committing the change.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/orders/edit_preview` |
+
+<ParamField body="order_id" type="string" required>
+  The ID of the order to preview editing.
+</ParamField>
+
+<ParamField body="price" type="string">
+  Proposed new limit price as a decimal string.
+</ParamField>
+
+<ParamField body="size" type="string">
+  Proposed new base size as a decimal string.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeEditOrderPreviewResponse>` — includes `slippage`, `order_total`, `commission_total`, `quote_size`, `base_size`, `best_bid`, `best_ask`, `average_filled_price`, and any `errors`.
+
+```typescript
+const preview = await client.updateOrderPreview({
+  order_id: 'afe6bb33-7a2a-4aa2-af41-3e9f09428e2b',
+  price: '61500.00',
+});
+
+console.log('Estimated order total:', preview.order_total);
+console.log('Commission:', preview.commission_total);
+```
+
+---
+
+## getOrders
+
+List historical orders filtered by optional query parameters. Open orders are limited to a maximum of 1,000 results. The `start_date` and `end_date` filters do not apply to open orders.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/orders/historical/batch` |
+
+<ParamField query="order_ids" type="string[]">
+  Filter to specific order IDs.
+</ParamField>
+
+<ParamField query="product_ids" type="string[]">
+  Filter by one or more product IDs, e.g. `["BTC-USD", "ETH-USD"]`.
+</ParamField>
+
+<ParamField query="product_type" type="string">
+  Filter by product type: `"SPOT"`, `"FUTURE"`, or `"UNKNOWN_PRODUCT_TYPE"`.
+</ParamField>
+
+<ParamField query="order_status" type="string[]">
+  Filter by status strings, e.g. `["OPEN"]`, `["FILLED"]`, `["CANCELLED"]`.
+</ParamField>
+
+<ParamField query="order_types" type="string[]">
+  Filter by order type strings, e.g. `["LIMIT"]`, `["MARKET"]`.
+</ParamField>
+
+<ParamField query="order_side" type="string">
+  Filter to `"BUY"` or `"SELL"` orders only.
+</ParamField>
+
+<ParamField query="start_date" type="string">
+  RFC3339 timestamp. Start of the date range for filled/cancelled orders.
+</ParamField>
+
+<ParamField query="end_date" type="string">
+  RFC3339 timestamp. End of the date range.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Maximum number of orders to return per page.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor from a previous response.
+</ParamField>
+
+<ParamField query="sort_by" type="string">
+  Sort results by `"LIMIT_PRICE"` or `"LAST_FILL_TIME"`.
+</ParamField>
+
+**Returns:** `Promise<{ orders: AdvTradeOrder[]; has_next: boolean; cursor?: string; sequence?: number }>`.
+
+```typescript
+// Fetch all open BTC-USD orders
+const { orders, has_next, cursor } = await client.getOrders({
+  product_ids: ['BTC-USD'],
+  order_status: ['OPEN'],
+  limit: 100,
+});
+
+console.log(`Found ${orders.length} open orders`);
+```
+
+---
+
+## getFills
+
+Retrieve a list of fills (trade executions) filtered by order, product, or time range.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/orders/historical/fills` |
+
+<ParamField query="order_ids" type="string[]">
+  Filter fills for specific order IDs.
+</ParamField>
+
+<ParamField query="trade_ids" type="string[]">
+  Filter fills for specific trade IDs.
+</ParamField>
+
+<ParamField query="product_ids" type="string[]">
+  Filter fills for specific products.
+</ParamField>
+
+<ParamField query="start_sequence_timestamp" type="string">
+  RFC3339 timestamp. Return fills at or after this sequence time.
+</ParamField>
+
+<ParamField query="end_sequence_timestamp" type="string">
+  RFC3339 timestamp. Return fills at or before this sequence time.
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Maximum number of fills to return per page.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor from a previous response.
+</ParamField>
+
+<ParamField query="sort_by" type="string">
+  Sort fills by `"PRICE"` or `"TRADE_TIME"`.
+</ParamField>
+
+**Returns:** `Promise<{ fills: AdvTradeFill[]; cursor?: string }>` — each `AdvTradeFill` contains `entry_id`, `trade_id`, `order_id`, `price`, `size`, `commission`, `side`, and RFC3339 `trade_time`.
+
+```typescript
+const { fills } = await client.getFills({
+  product_ids: ['BTC-USD'],
+  start_sequence_timestamp: '2024-01-01T00:00:00Z',
+  end_sequence_timestamp: '2024-01-31T23:59:59Z',
+  limit: 250,
+});
+
+const totalCommission = fills.reduce(
+  (sum, f) => sum + parseFloat(f.commission),
+  0,
+);
+console.log(`Total commission paid: ${totalCommission.toFixed(8)}`);
+```
+
+---
+
+## getOrder
+
+Retrieve a single historical order by its order ID.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/orders/historical/{order_id}` |
+
+<ParamField path="order_id" type="string" required>
+  The unique order ID returned by `submitOrder()`.
+</ParamField>
+
+<ParamField query="client_order_id" type="string">
+  Optionally filter by client-supplied order ID.
+</ParamField>
+
+<ParamField query="user_native_currency" type="string">
+  Return values expressed in this currency, e.g. `"EUR"`.
+</ParamField>
+
+**Returns:** `Promise<{ order: AdvTradeOrder }>` — the full order record including `status`, `filled_size`, `average_filled_price`, `total_fees`, and `order_configuration`.
+
+```typescript
+const { order } = await client.getOrder({
+  order_id: 'afe6bb33-7a2a-4aa2-af41-3e9f09428e2b',
+});
+
+console.log(`Status: ${order.status}`);
+console.log(`Filled: ${order.filled_size} @ ${order.average_filled_price}`);
+```
+
+---
+
+## previewOrder
+
+Simulate submitting an order to see the estimated total, commission, leverage parameters, and possible errors — without actually placing the order.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/orders/preview` |
+
+<ParamField body="product_id" type="string" required>
+  The trading pair to preview, e.g. `"BTC-USD"`.
+</ParamField>
+
+<ParamField body="side" type="string" required>
+  `"BUY"` or `"SELL"`.
+</ParamField>
+
+<ParamField body="order_configuration" type="OrderConfiguration" required>
+  The order configuration to preview. Uses the same structure as `submitOrder()`.
+</ParamField>
+
+<ParamField body="leverage" type="string">
+  Leverage multiplier for margin/futures previews.
+</ParamField>
+
+<ParamField body="margin_type" type="string">
+  `"ISOLATED"` or `"CROSS"`.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeOrderPreview>` — includes `order_total`, `commission_total`, `base_size`, `quote_size`, `best_bid`, `best_ask`, `slippage`, `leverage`, `preview_id`, and buffer fields for leveraged positions.
+
+```typescript
+const preview = await client.previewOrder({
+  product_id: 'BTC-USD',
+  side: 'BUY',
+  order_configuration: {
+    limit_limit_gtc: {
+      base_size: '0.01',
+      limit_price: '60000.00',
+    },
+  },
+});
+
+console.log('Estimated order total:', preview.order_total);
+console.log('Commission:', preview.commission_total);
+// Use preview.preview_id in submitOrder() to link the two calls
+```
+
+---
+
+## closePosition
+
+Place an order that closes any open position for the specified futures or perpetuals product. The SDK auto-generates `client_order_id` if omitted.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `POST /api/v3/brokerage/orders/close_position` |
+
+<ParamField body="product_id" type="string" required>
+  The futures or perpetuals product ID whose open position should be closed.
+</ParamField>
+
+<ParamField body="size" type="string">
+  Quantity to close. Omit to close the entire open position.
+</ParamField>
+
+<ParamField body="client_order_id" type="string">
+  Optional client-supplied identifier. Auto-generated if omitted.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeClosePositionResponse>` — contains `success`, an optional `success_response` with order details, and an optional `error_response`.
+
+```typescript
+const result = await client.closePosition({
+  product_id: 'BTC-28JUN24-CDE',
+});
+
+if (result.success) {
+  console.log('Position closed, order ID:', result.success_response?.order_id);
+}
+```

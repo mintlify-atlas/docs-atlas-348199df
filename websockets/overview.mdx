@@ -1,0 +1,204 @@
+---
+title: "WebSocket Streams: Real-Time Coinbase Market Data"
+sidebarTitle: "Overview"
+description: "The WebsocketClient manages all Coinbase WebSocket connections — market data, user events, exchange feeds — with auto-reconnect and typed event emission."
+---
+
+The `WebsocketClient` is a single, unified client that manages every Coinbase WebSocket feed. You instantiate it once, attach event listeners, and call `subscribe()` — the client handles connection setup, authentication, heartbeats, and reconnection automatically.
+
+## How it works
+
+Each distinct WebSocket server URL is represented internally as a **WsKey** — a short string constant defined in `WS_KEY_MAP`. When you call `subscribe(topic, wsKey)`, the client looks up the right connection for that WsKey, opens it if it isn't already open, authenticates if required, then sends the subscription request.
+
+```typescript
+import { WebsocketClient, WS_KEY_MAP } from 'coinbase-api';
+```
+
+<Note>
+  `WS_KEY_MAP` can be used as an enum to avoid typos. `WS_KEY_MAP.advTradeMarketData` and the plain string `'advTradeMarketData'` are identical at runtime — use whichever you prefer.
+</Note>
+
+## Available WsKeys
+
+<CardGroup cols={2}>
+  <Card title="advTradeMarketData" icon="chart-line">
+    Advanced Trade **public** market data — ticker, candles, order book, trades. No authentication required.
+  </Card>
+  <Card title="advTradeUserData" icon="lock">
+    Advanced Trade **private** user data — order fills, futures balance. Authentication required.
+  </Card>
+  <Card title="exchangeMarketData" icon="chart-bar">
+    Coinbase Exchange **public** market data feed. No authentication required.
+  </Card>
+  <Card title="exchangeDirectMarketData" icon="server">
+    Coinbase Exchange **direct** feed with lower latency. Authentication always required.
+  </Card>
+  <Card title="internationalMarketData" icon="globe">
+    Coinbase International (INTX) feed. Authentication always required.
+  </Card>
+  <Card title="primeMarketData" icon="building-columns">
+    Coinbase Prime feed. Authentication always required.
+  </Card>
+</CardGroup>
+
+## Instantiation
+
+<Tabs>
+  <Tab title="Public (no credentials)">
+    ```typescript
+    import { WebsocketClient } from 'coinbase-api';
+
+    // No credentials needed for public feeds
+    const client = new WebsocketClient();
+    ```
+  </Tab>
+  <Tab title="Private (Advanced Trade)">
+    ```typescript
+    import { WebsocketClient } from 'coinbase-api';
+
+    // Advanced Trade uses JWT auth (apiKey = key name, apiSecret = EC private key)
+    const client = new WebsocketClient({
+      apiKey: process.env.API_KEY_NAME,
+      apiSecret: process.env.API_PRIVATE_KEY,
+    });
+    ```
+  </Tab>
+  <Tab title="Private (Exchange / International / Prime)">
+    ```typescript
+    import { WebsocketClient } from 'coinbase-api';
+
+    // Exchange, International, and Prime require an additional passphrase
+    const client = new WebsocketClient({
+      apiKey: process.env.API_KEY,
+      apiSecret: process.env.API_SECRET,
+      apiPassphrase: process.env.API_PASSPHRASE,
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Subscribing to topics
+
+Call `subscribe(topic | topics[], wsKey)` to subscribe. Topics can be plain strings (no parameters needed) or structured objects with a `payload` for channels that require parameters such as `product_ids`.
+
+```typescript
+// Simple string — no parameters needed
+client.subscribe('heartbeats', 'advTradeMarketData');
+
+// Object with payload — passes product_ids to the exchange
+client.subscribe(
+  {
+    topic: 'ticker',
+    payload: {
+      product_ids: ['BTC-USD', 'ETH-USD'],
+    },
+  },
+  'advTradeMarketData',
+);
+
+// Array — subscribe to multiple topics in one call
+client.subscribe(
+  [
+    { topic: 'candles', payload: { product_ids: ['ETH-USD'] } },
+    { topic: 'level2', payload: { product_ids: ['BTC-USD'] } },
+  ],
+  'advTradeMarketData',
+);
+```
+
+## Unsubscribing
+
+`unsubscribe()` mirrors `subscribe()` exactly. The topic is removed from the SDK's internal cache, so it won't be resubscribed after a reconnect.
+
+```typescript
+client.unsubscribe(
+  { topic: 'ticker', payload: { product_ids: ['BTC-USD'] } },
+  'advTradeMarketData',
+);
+```
+
+## Event listeners
+
+All data and lifecycle events are emitted on the `WebsocketClient` instance. Attach listeners **before** calling `subscribe()`.
+
+```typescript
+// Connection opened for a given wsKey
+client.on('open', (data) => {
+  console.log('Connection opened:', data.wsKey);
+});
+
+// Market data received — this is where your trading logic goes
+client.on('update', (data) => {
+  console.log('Data update:', JSON.stringify(data));
+});
+
+// Attempting to reconnect after a drop
+client.on('reconnect', (data) => {
+  console.log('Reconnecting…', data.wsKey);
+});
+
+// Reconnection succeeded — subscriptions are restored automatically
+client.on('reconnected', (data) => {
+  console.log('Reconnected:', data.wsKey);
+});
+
+// Connection closed (expected or unexpected)
+client.on('close', (data) => {
+  console.warn('Connection closed:', data.wsKey);
+});
+
+// Reply to a subscribe/unsubscribe/authenticate command
+client.on('response', (data) => {
+  console.info('Response:', JSON.stringify(data, null, 2));
+});
+
+// Error from the WS client or inside your own listener
+client.on('exception', (data) => {
+  console.error('Exception:', data);
+});
+```
+
+### Event reference
+
+| Event | Payload | When it fires |
+|---|---|---|
+| `open` | `{ wsKey, event }` | A new connection is established for the first time |
+| `update` | `{ wsKey, ...channelData }` | The exchange sends channel data |
+| `reconnect` | `{ wsKey, event }` | Connection dropped; client is attempting to reconnect |
+| `reconnected` | `{ wsKey, event }` | Reconnection succeeded; topics are re-subscribed |
+| `close` | `{ wsKey, event }` | Connection closed (expected or unexpected) |
+| `response` | `{ wsKey, ...reply }` | Reply to a subscribe / unsubscribe / authenticate request |
+| `exception` | `{ wsKey, ...error }` | An error occurred in the client or your listener |
+
+## Explicit connection
+
+The client connects automatically the first time you call `subscribe()`. To pre-open all connections at once (useful for minimising latency on the first message), call `connectAll()`:
+
+```typescript
+// Opens all six WebSocket connections immediately
+await client.connectAll();
+```
+
+## Auto-reconnect behaviour
+
+If the underlying TCP connection drops, the client:
+
+1. Emits a `reconnect` event.
+2. Waits for `reconnectTimeout` milliseconds (default `500 ms`).
+3. Re-opens the connection and re-sends all active subscriptions.
+4. Emits a `reconnected` event when complete.
+
+No code changes or manual re-subscription are needed on your end.
+
+## Configuration options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `apiKey` | `string` | — | API key name (Advanced Trade) or key ID |
+| `apiSecret` | `string` | — | EC private key (Advanced Trade) or HMAC secret |
+| `apiPassphrase` | `string` | — | Passphrase for Exchange / International / Prime |
+| `pingInterval` | `number` | `10000` | How often (ms) to send a ping |
+| `pongTimeout` | `number` | `1000` | How long (ms) to wait for a pong before assuming disconnect |
+| `reconnectTimeout` | `number` | `500` | Delay (ms) before attempting reconnect |
+| `useSandbox` | `boolean` | `false` | Connect to the sandbox (Exchange & International only) |
+| `jwtExpiresSeconds` | `number` | `120` | JWT TTL in seconds for Advanced Trade auth |

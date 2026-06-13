@@ -1,0 +1,112 @@
+---
+title: "Use coinbase-api with AI Coding Assistants and LLMs"
+sidebarTitle: "AI & LLMs"
+description: "The coinbase-api SDK ships an llms.txt file with AI-optimised SDK documentation to improve code generation accuracy with ChatGPT, Claude, Copilot, and other LLMs."
+---
+
+Large language models trained on general code may produce plausible but incorrect usage of the `coinbase-api` SDK — inventing method names, guessing parameter shapes, or mixing up API clients. The SDK ships an `llms.txt` file specifically designed to fix this by giving AI tools accurate, structured knowledge of every function and its parameters.
+
+## What is llms.txt?
+
+`llms.txt` is a compact, AI-optimised representation of the entire SDK surface area. It is generated using [Repomix](https://repomix.com/) and contains:
+
+- A complete listing of all SDK functions across every client (`CBAdvancedTradeClient`, `CBAppClient`, `CBExchangeClient`, `CBInternationalClient`, `CBPrimeClient`, `CBCommerceClient`, and `WebsocketClient`)
+- Parameter names and types for each method
+- Structural context about how clients, authentication, and WebSocket keys relate to one another
+- Enough surrounding code structure for an LLM to reason about patterns like error handling, subscription flow, and signing
+
+When an LLM has this file in its context window, it produces correct method names, accurate parameter types, and idiomatic usage patterns rather than hallucinating an API shape.
+
+## Where to Find the File
+
+The `llms.txt` file is included in the npm package's `files` field, so it is shipped with every install:
+
+```bash
+# After installing the package:
+cat node_modules/coinbase-api/llms.txt
+```
+
+You can also access it directly from the GitHub repository:
+
+```
+https://github.com/tiagosiebler/coinbase-api/blob/master/llms.txt
+```
+
+## How to Use It with AI Tools
+
+<Tabs>
+  <Tab title="ChatGPT / Claude">
+    Copy the full contents of `llms.txt` and paste it at the start of your conversation before asking your coding question:
+
+    ```
+    Here is the SDK reference for coinbase-api. Use this as the authoritative
+    source for all method names and parameters:
+
+    [paste llms.txt contents here]
+
+    Now help me write a function that subscribes to the BTC-USD ticker...
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Add `llms.txt` as a project context file so Cursor references it automatically for all completions in your project:
+
+    1. Open the Cursor settings (`Cmd+Shift+J` / `Ctrl+Shift+J`).
+    2. Navigate to **Features → Docs**.
+    3. Add the path `node_modules/coinbase-api/llms.txt` as a local context file.
+
+    Cursor will now include SDK context when generating coinbase-api code.
+  </Tab>
+  <Tab title="GitHub Copilot">
+    Reference `llms.txt` in your workspace by opening it in an editor tab alongside your code. Copilot uses open editor tabs as additional context when generating suggestions.
+
+    Alternatively, use Copilot Chat and attach the file directly:
+
+    ```
+    @workspace /node_modules/coinbase-api/llms.txt
+    How do I subscribe to private user data via WebSocket?
+    ```
+  </Tab>
+  <Tab title="Claude Projects">
+    Upload `llms.txt` as a project knowledge file in Claude Projects:
+
+    1. Open your Claude Project.
+    2. Click **Add content → Upload file**.
+    3. Upload `node_modules/coinbase-api/llms.txt`.
+
+    Claude will reference it automatically for all conversations in that project.
+  </Tab>
+</Tabs>
+
+## Why It Dramatically Improves Code Generation
+
+Without SDK context, LLMs frequently make these mistakes when writing `coinbase-api` code:
+
+| Without `llms.txt` | With `llms.txt` |
+|--------------------|-----------------|
+| Invents method names that don't exist | Uses exact method names from the SDK |
+| Guesses parameter structures | Uses the correct TypeScript parameter types |
+| Confuses which client to use for which API | Correctly maps API groups to their clients |
+| Misses required fields like `client_order_id` | Includes all required fields with proper values |
+| Uses incorrect WebSocket key strings | Uses valid `WsKey` values from `WS_KEY_MAP` |
+
+<Tip>
+  Combine `llms.txt` with this documentation for the best results. Use `llms.txt` to give your AI assistant accurate function signatures, and reference these docs pages for conceptual guidance on error handling, authentication patterns, and WebSocket lifecycle management.
+</Tip>
+
+## The File is Always Up to Date
+
+Because `llms.txt` is included in the npm package's `files` field alongside the compiled `dist/` output, the version of `llms.txt` in your `node_modules` always matches the version of the SDK you have installed. Updating the package with `npm update coinbase-api` automatically updates the AI context file too.
+
+```json
+// package.json (from the coinbase-api package)
+{
+  "files": [
+    "dist/*",
+    "llms.txt"
+  ]
+}
+```
+
+<Note>
+  The `llms.txt` file is generated using [Repomix](https://repomix.com/) and contains a compressed, structured view of the most important parts of the codebase. Binary files, test files, and auto-generated endpoint lists are excluded to keep the context window usage efficient.
+</Note>

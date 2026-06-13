@@ -1,0 +1,325 @@
+---
+title: "CBAppClient: Consumer Wallet Accounts & Transactions"
+sidebarTitle: "Coinbase App"
+description: "CBAppClient connects to the Coinbase App API for managing consumer wallet accounts, crypto addresses, transactions, deposits, and withdrawals."
+---
+
+`CBAppClient` is the REST client for Coinbase's [App API](https://docs.cdp.coinbase.com/coinbase-app/docs/welcome). It targets consumer and retail wallet operations — listing accounts and balances, generating deposit addresses, sending and receiving crypto, managing fiat deposits and withdrawals, and querying market prices and exchange rates.
+
+<Note>
+  CBAppClient uses the same JWT-based CDP API keys as `CBAdvancedTradeClient` (ECDSA or ED25519). No `apiPassphrase` is required.
+</Note>
+
+## Installation
+
+```bash
+npm install coinbase-api
+```
+
+## Instantiation
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { CBAppClient } from 'coinbase-api';
+
+    const client = new CBAppClient({
+      apiKey: 'organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID',
+      apiSecret: '-----BEGIN EC PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----\n',
+    });
+
+    // Or use the downloaded cdpApiKey JSON object:
+    const client2 = new CBAppClient({
+      cdpApiKey: {
+        name: 'organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID',
+        privateKey: '-----BEGIN EC PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----\n',
+      },
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const { CBAppClient } = require('coinbase-api');
+
+    const client = new CBAppClient({
+      apiKey: 'organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID',
+      apiSecret: '-----BEGIN EC PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----\n',
+    });
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  `CBAppClient` automatically injects a `CB-VERSION` header on every request, required by the Coinbase App API for versioning. You do not need to set this manually.
+</Tip>
+
+---
+
+## Accounts
+
+Retrieve wallet accounts that the current API key has access to. Results are paginated — use `paginationURL` from the response to fetch the next page.
+
+| Method | Description |
+|---|---|
+| `getAccounts(params?)` | List all accounts (paginated) |
+| `getAccount(params)` | Get a single account by ID or currency |
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    // First page
+    const page1 = await client.getAccounts();
+
+    // Next page using the pagination URL from the previous response
+    const page2 = await client.getAccounts({
+      paginationURL: page1.pagination.next_uri,
+    });
+
+    // Get a specific account
+    const account = await client.getAccount({ account_id: 'btc-account-uuid' });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    // First page
+    const page1 = await client.getAccounts();
+
+    // Next page using the pagination URL from the previous response
+    const page2 = await client.getAccounts({
+      paginationURL: page1.pagination.next_uri,
+    });
+
+    // Get a specific account
+    const account = await client.getAccount({ account_id: 'btc-account-uuid' });
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  When `paginationURL` is provided, the SDK extracts the endpoint and query parameters from the URL automatically — you do not need to parse it manually.
+</Note>
+
+---
+
+## Addresses
+
+Generate deposit addresses for wallet accounts and list existing ones.
+
+| Method | Description |
+|---|---|
+| `createAddress(params)` | Create a new deposit address for an account |
+| `getAddresses(params)` | List addresses for an account (paginated) |
+| `getAddress(params)` | Get a specific address by ID |
+| `getAddressTransactions(params)` | List transactions sent to an address |
+
+```typescript
+// Create a new BTC deposit address
+const newAddress = await client.createAddress({
+  account_id: 'btc-account-uuid',
+  name: 'My deposit address',
+});
+
+// List all addresses
+const addresses = await client.getAddresses({ account_id: 'btc-account-uuid' });
+
+// Transactions received at a specific address
+const txns = await client.getAddressTransactions({
+  account_id: 'btc-account-uuid',
+  addressId: newAddress.data.id,
+});
+```
+
+---
+
+## Transactions
+
+Send crypto to external addresses or email recipients, transfer between your own accounts, and list transaction history.
+
+| Method | Description |
+|---|---|
+| `sendMoney(params)` | Send crypto to a network address or email |
+| `transferMoney(params)` | Transfer crypto between your own accounts |
+| `getTransactions(params)` | List transactions for an account (paginated) |
+| `getTransaction(params)` | Get a single transaction by ID |
+
+<CodeGroup>
+  ```typescript Send crypto
+  const tx = await client.sendMoney({
+    account_id: 'eth-account-uuid',
+    type: 'send',
+    to: '0xRecipientAddress',
+    amount: '0.01',
+    currency: 'ETH',
+    description: 'Payment for services',
+  });
+  ```
+
+  ```typescript Transfer between accounts
+  const transfer = await client.transferMoney({
+    account_id: 'usdc-account-uuid',
+    type: 'transfer',
+    to: 'target-account-uuid',
+    amount: '50',
+    currency: 'USDC',
+  });
+  ```
+
+  ```typescript List transactions
+  const txns = await client.getTransactions({
+    account_id: 'btc-account-uuid',
+  });
+  ```
+</CodeGroup>
+
+---
+
+## Deposits
+
+Deposit fiat funds into a Coinbase account from a linked payment method. Deposits can be created in a `commit: false` state and confirmed separately.
+
+| Method | Description |
+|---|---|
+| `depositFunds(params)` | Initiate a fiat deposit |
+| `commitDeposit(params)` | Confirm a pending deposit |
+| `getDeposits(params)` | List deposits for an account (paginated) |
+| `getDeposit(params)` | Get a single deposit |
+
+```typescript
+// Deposit $100 from a linked payment method
+const deposit = await client.depositFunds({
+  account_id: 'usd-account-uuid',
+  amount: '100',
+  currency: 'USD',
+  payment_method: 'payment-method-uuid',
+});
+
+// If created with commit: false, confirm it:
+await client.commitDeposit({
+  account_id: 'usd-account-uuid',
+  deposit_id: deposit.data.id,
+});
+```
+
+---
+
+## Withdrawals
+
+Withdraw fiat funds from a Coinbase account to a linked payment method.
+
+| Method | Description |
+|---|---|
+| `withdrawFunds(params)` | Initiate a fiat withdrawal |
+| `commitWithdrawal(params)` | Confirm a pending withdrawal |
+| `getWithdrawals(params)` | List withdrawals for an account (paginated) |
+| `getWithdrawal(params)` | Get a single withdrawal |
+
+```typescript
+const withdrawal = await client.withdrawFunds({
+  account_id: 'usd-account-uuid',
+  amount: '200',
+  currency: 'USD',
+  payment_method: 'payment-method-uuid',
+});
+
+// Confirm if needed
+await client.commitWithdrawal({
+  account_id: 'usd-account-uuid',
+  withdrawal_id: withdrawal.data.id,
+});
+```
+
+---
+
+## Currencies
+
+Query supported fiat and crypto currencies. These endpoints are public and do not require authentication.
+
+| Method | Description |
+|---|---|
+| `getFiatCurrencies()` | List all supported fiat currencies (ISO 4217) |
+| `getCryptocurrencies()` | List all supported cryptocurrencies |
+
+```typescript
+const fiats = await client.getFiatCurrencies();
+const cryptos = await client.getCryptocurrencies();
+```
+
+---
+
+## Exchange Rates
+
+```typescript
+// Get exchange rates relative to USD (default base)
+const rates = await client.getExchangeRates();
+
+// Or specify a different base currency
+const eurRates = await client.getExchangeRates({ currency: 'EUR' });
+```
+
+---
+
+## Prices
+
+Get indicative buy, sell, and spot prices for a currency pair. These endpoints do not require authentication.
+
+| Method | Description |
+|---|---|
+| `getBuyPrice(params)` | Total cost to buy one unit |
+| `getSellPrice(params)` | Total proceeds from selling one unit |
+| `getSpotPrice(params)` | Mid-market spot price (optionally at a historical date) |
+
+```typescript
+const buy  = await client.getBuyPrice({ currencyPair: 'BTC-USD' });
+const sell = await client.getSellPrice({ currencyPair: 'BTC-USD' });
+const spot = await client.getSpotPrice({ currencyPair: 'ETH-USD' });
+
+// Historical spot price
+const historical = await client.getSpotPrice({
+  currencyPair: 'BTC-USD',
+  date: '2024-01-01',
+});
+```
+
+---
+
+## Time
+
+```typescript
+// Get the API server time (no auth required)
+const time = await client.getCurrentTime();
+// Returns: { data: { iso: string, epoch: number } }
+```
+
+---
+
+## Pagination Pattern
+
+Several endpoints — `getAccounts`, `getAddresses`, `getTransactions`, `getDeposits`, and `getWithdrawals` — return a `pagination` object alongside the `data` array. Pass `pagination.next_uri` back as `paginationURL` to iterate through pages.
+
+```typescript
+async function getAllAccounts(client) {
+  const results = [];
+  let paginationURL;
+
+  do {
+    const page = await client.getAccounts({ paginationURL });
+    results.push(...page.data);
+    paginationURL = page.pagination.next_uri;
+  } while (paginationURL);
+
+  return results;
+}
+```
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Trade Client" icon="chart-line" href="/rest/advanced-trade">
+    Professional trading, orders, futures, and perpetuals
+  </Card>
+  <Card title="Exchange Client" icon="building-columns" href="/rest/exchange">
+    Pro trading platform with profiles and full order management
+  </Card>
+</CardGroup>

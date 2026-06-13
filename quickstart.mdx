@@ -1,47 +1,291 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with coinbase-api in Under 5 Minutes"
+sidebarTitle: "Quickstart"
+description: "Install the coinbase-api SDK, create your first client, and make a live REST API call to Coinbase's Advanced Trade platform in a few steps."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
-
-<Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
-
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
-
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
-
-    ```bash
-    your-cli start
-    ```
-  </Step>
-</Steps>
+This guide walks you through installing `coinbase-api`, configuring credentials, and making your first authenticated REST and WebSocket calls. By the end you will have a working Node.js script that fetches your Coinbase accounts and subscribes to live ticker updates.
 
 <Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+  This quickstart uses `CBAdvancedTradeClient` as the example. The same patterns apply to every other client in the SDK. See the [Authentication guide](/authentication) for credential setup details for Exchange, International, and Prime clients.
 </Tip>
+
+<Steps>
+
+### Install the package
+
+<CodeGroup>
+
+```bash npm
+npm install coinbase-api
+```
+
+```bash yarn
+yarn add coinbase-api
+```
+
+```bash pnpm
+pnpm add coinbase-api
+```
+
+</CodeGroup>
+
+The package ships precompiled ESM and CJS builds — no build step required in your project.
+
+### Create your API keys
+
+Navigate to [https://www.coinbase.com/settings/api](https://www.coinbase.com/settings/api) and create a new API key for the Coinbase product you want to use.
+
+- For **Advanced Trade** and **App** APIs: Coinbase issues a **CDP API key**, which downloads as a `cdp_api_key.json` file containing a `name` and `privateKey` field. Both ECDSA and ED25519 key types are supported.
+- For **Exchange**, **International**, and **Prime** APIs: Coinbase issues an **API key + secret + passphrase** combination.
+
+Store your credentials as environment variables — never hard-code them in source files.
+
+```bash
+export API_KEY_NAME="organizations/your-org-id/apiKeys/your-key-id"
+export API_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----
+...
+-----END EC PRIVATE KEY-----"
+```
+
+### Instantiate the client
+
+The SDK gives you two ways to supply credentials for JWT-based clients (`CBAdvancedTradeClient` and `CBAppClient`).
+
+<Tabs>
+
+<Tab title="TypeScript">
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+// Option A: pass the downloaded cdp_api_key.json as an object
+const cdpApiKey = {
+  name: 'organizations/13232211d-d7e2-d7e2-d7e2-d7e2d7e2d7e2/apiKeys/d7e2d7e2-d7e2-d7e2-d7e2-d7e2d7e2d7e2',
+  privateKey:
+    '-----BEGIN EC PRIVATE KEY-----\nADFGHmkgnjdfg16k165kuu1k...\n-----END EC PRIVATE KEY-----\n',
+};
+
+const clientViaJson = new CBAdvancedTradeClient({ cdpApiKey });
+
+// Option B: pass key name as `apiKey` and private key as `apiSecret` directly
+const client = new CBAdvancedTradeClient({
+  apiKey: process.env.API_KEY_NAME!,
+  apiSecret: process.env.API_PRIVATE_KEY!,
+});
+```
+
+</Tab>
+
+<Tab title="JavaScript">
+
+```javascript
+const { CBAdvancedTradeClient } = require('coinbase-api');
+
+// Option A: pass the downloaded cdp_api_key.json as an object
+const cdpApiKey = {
+  name: 'organizations/13232211d-d7e2-d7e2-d7e2-d7e2d7e2d7e2/apiKeys/d7e2d7e2-d7e2-d7e2-d7e2-d7e2d7e2d7e2',
+  privateKey:
+    '-----BEGIN EC PRIVATE KEY-----\nADFGHmkgnjdfg16k165kuu1k...\n-----END EC PRIVATE KEY-----\n',
+};
+
+const clientViaJson = new CBAdvancedTradeClient({ cdpApiKey });
+
+// Option B: pass key name as `apiKey` and private key as `apiSecret` directly
+const client = new CBAdvancedTradeClient({
+  apiKey: process.env.API_KEY_NAME || 'insert_api_key_here',
+  apiSecret: process.env.API_PRIVATE_KEY || 'insert_api_secret_here',
+});
+```
+
+</Tab>
+
+</Tabs>
+
+Both ECDSA (PEM-formatted `-----BEGIN EC PRIVATE KEY-----`) and ED25519 (base64 string) key formats are detected automatically — you do not need to configure the key type manually.
+
+### Make your first REST call
+
+<Tabs>
+
+<Tab title="TypeScript">
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: process.env.API_KEY_NAME!,
+  apiSecret: process.env.API_PRIVATE_KEY!,
+});
+
+async function main() {
+  // Fetch up to 10 accounts
+  const accounts = await client.getAccounts({ limit: 10 });
+  console.log('Accounts:', accounts);
+
+  // Fetch details for the first account
+  if (accounts.accounts.length > 0) {
+    const accountId = accounts.accounts[0].uuid;
+    const details = await client.getAccount({ account_id: accountId });
+    console.log('Account details:', details);
+  }
+
+  // Submit a market sell order
+  const order = await client.submitOrder({
+    product_id: 'BTC-USDT',
+    side: 'SELL',
+    client_order_id: client.generateNewOrderId(),
+    order_configuration: {
+      market_market_ioc: { base_size: '0.001' },
+    },
+  });
+  console.log('Order result:', order);
+}
+
+main().catch(console.error);
+```
+
+</Tab>
+
+<Tab title="JavaScript">
+
+```javascript
+const { CBAdvancedTradeClient } = require('coinbase-api');
+
+const client = new CBAdvancedTradeClient({
+  apiKey: process.env.API_KEY_NAME || 'insert_api_key_here',
+  apiSecret: process.env.API_PRIVATE_KEY || 'insert_api_secret_here',
+});
+
+async function main() {
+  // Fetch up to 10 accounts
+  const accounts = await client.getAccounts({ limit: 10 });
+  console.log('Accounts:', accounts);
+
+  // Fetch details for the first account
+  if (accounts.accounts.length > 0) {
+    const accountId = accounts.accounts[0].uuid;
+    const details = await client.getAccount({ account_id: accountId });
+    console.log('Account details:', details);
+  }
+
+  // Submit a market sell order
+  const order = await client.submitOrder({
+    product_id: 'BTC-USDT',
+    side: 'SELL',
+    client_order_id: client.generateNewOrderId(),
+    order_configuration: {
+      market_market_ioc: { base_size: '0.001' },
+    },
+  });
+  console.log('Order result:', order);
+}
+
+main().catch(console.error);
+```
+
+</Tab>
+
+</Tabs>
+
+`generateNewOrderId()` is a utility method on every REST client that produces a unique, prefixed `client_order_id` string. Coinbase requires this field on every order submission.
+
+### Subscribe to WebSocket data
+
+<Tabs>
+
+<Tab title="TypeScript">
+
+```typescript
+import { WebsocketClient } from 'coinbase-api';
+
+// Public market data — no credentials required
+const ws = new WebsocketClient();
+
+ws.on('open', (data) => console.log('Connected:', data?.wsKey));
+ws.on('update', (data) => console.log(new Date(), 'Data:', JSON.stringify(data)));
+ws.on('reconnect', (data) => console.log('Reconnecting...', data));
+ws.on('reconnected', (data) => console.log('Reconnected:', data?.wsKey));
+ws.on('close', (data) => console.error('Closed:', data));
+ws.on('exception', (data) => console.error('Error:', data));
+
+// Subscribe to BTC-USD and ETH-USD ticker on the Advanced Trade market data feed
+ws.subscribe(
+  {
+    topic: 'ticker',
+    payload: { product_ids: ['BTC-USD', 'ETH-USD'] },
+  },
+  'advTradeMarketData',
+);
+
+// Subscribe to authenticated user order updates
+const privateWs = new WebsocketClient({
+  apiKey: process.env.API_KEY_NAME!,
+  apiSecret: process.env.API_PRIVATE_KEY!,
+});
+
+privateWs.on('update', (data) => console.log('User event:', data));
+privateWs.subscribe('user', 'advTradeUserData');
+```
+
+</Tab>
+
+<Tab title="JavaScript">
+
+```javascript
+const { WebsocketClient } = require('coinbase-api');
+
+// Public market data — no credentials required
+const ws = new WebsocketClient();
+
+ws.on('open', (data) => console.log('Connected:', data?.wsKey));
+ws.on('update', (data) => console.log(new Date(), 'Data:', JSON.stringify(data)));
+ws.on('reconnect', (data) => console.log('Reconnecting...', data));
+ws.on('reconnected', (data) => console.log('Reconnected:', data?.wsKey));
+ws.on('close', (data) => console.error('Closed:', data));
+ws.on('exception', (data) => console.error('Error:', data));
+
+// Subscribe to BTC-USD and ETH-USD ticker on the Advanced Trade market data feed
+ws.subscribe(
+  {
+    topic: 'ticker',
+    payload: { product_ids: ['BTC-USD', 'ETH-USD'] },
+  },
+  'advTradeMarketData',
+);
+
+// Subscribe to authenticated user order updates
+const privateWs = new WebsocketClient({
+  apiKey: process.env.API_KEY_NAME || 'insert_api_key_here',
+  apiSecret: process.env.API_PRIVATE_KEY || 'insert_api_secret_here',
+});
+
+privateWs.on('update', (data) => console.log('User event:', data));
+privateWs.subscribe('user', 'advTradeUserData');
+```
+
+</Tab>
+
+</Tabs>
+
+The `WebsocketClient` automatically manages connection lifecycle: it sends heartbeat pings, detects dropped connections, reconnects, and replays all subscriptions without any extra code on your side.
+
+</Steps>
+
+## ESM vs CJS imports
+
+Both module systems are fully supported. The correct build is selected automatically by Node.js at runtime.
+
+```typescript
+// ESM — TypeScript, .mjs files, or projects with "type": "module"
+import { CBAdvancedTradeClient, WebsocketClient } from 'coinbase-api';
+
+// CJS — traditional require-based projects
+const { CBAdvancedTradeClient, WebsocketClient } = require('coinbase-api');
+```
+
+## Next Steps
+
+- Read the [Authentication guide](/authentication) for a full breakdown of credentials for each client type.
+- Browse the [examples directory](https://github.com/tiagosiebler/coinbase-api/tree/master/examples) on GitHub for more real-world usage patterns.
+- See the [endpoint function list](https://github.com/tiagosiebler/coinbase-api/blob/master/docs/endpointFunctionList.md) for every available method across all six clients.

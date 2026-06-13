@@ -1,0 +1,408 @@
+---
+title: "CBAdvancedTradeClient: Orders, Products & Portfolios"
+sidebarTitle: "Advanced Trade"
+description: "CBAdvancedTradeClient provides full access to Coinbase's Advanced Trade API — retail and institutional trading, futures, perpetuals, and payment methods."
+---
+
+`CBAdvancedTradeClient` is the primary REST client for Coinbase's [Advanced Trade API](https://docs.cdp.coinbase.com/advanced-trade/docs/api-overview/). It covers everything from live order management and portfolio tracking to futures, perpetual swaps, asset conversions, and payment methods — all authenticated with JWT-based CDP API keys.
+
+<Note>
+  Advanced Trade uses JWT authentication (ECDSA or ED25519 keys). You do **not** need an `apiPassphrase` — only the key name and private key are required.
+</Note>
+
+## Installation
+
+```bash
+npm install coinbase-api
+```
+
+## Instantiation
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { CBAdvancedTradeClient } from 'coinbase-api';
+
+    // Option 1: pass key name + private key directly
+    const client = new CBAdvancedTradeClient({
+      apiKey: 'organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID',
+      apiSecret: '-----BEGIN EC PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----\n',
+    });
+
+    // Option 2: pass the full CDP JSON object (downloaded from Coinbase)
+    const client2 = new CBAdvancedTradeClient({
+      cdpApiKey: {
+        name: 'organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID',
+        privateKey: '-----BEGIN EC PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----\n',
+      },
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    const { CBAdvancedTradeClient } = require('coinbase-api');
+
+    // Option 1: pass key name + private key directly
+    const client = new CBAdvancedTradeClient({
+      apiKey: 'organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID',
+      apiSecret: '-----BEGIN EC PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----\n',
+    });
+
+    // Option 2: pass the full CDP JSON object (downloaded from Coinbase)
+    const client2 = new CBAdvancedTradeClient({
+      cdpApiKey: {
+        name: 'organizations/YOUR_ORG_ID/apiKeys/YOUR_KEY_ID',
+        privateKey: '-----BEGIN EC PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END EC PRIVATE KEY-----\n',
+      },
+    });
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Both ECDSA and ED25519 key formats are supported — the client detects the key type automatically. For ED25519, the `privateKey` value is a Base64 string rather than a PEM block.
+</Tip>
+
+---
+
+## Accounts
+
+Retrieve the list of brokerage accounts associated with your API key or look up a single account by UUID.
+
+| Method | Description |
+|---|---|
+| `getAccounts(params?)` | List all authenticated accounts |
+| `getAccount(params)` | Get a single account by UUID |
+
+```typescript
+// List all accounts (paginated)
+const accounts = await client.getAccounts({ limit: 50 });
+
+// Fetch one account by ID
+const account = await client.getAccount({
+  account_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+});
+```
+
+---
+
+## Products & Market Data
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    // List tradeable currency pairs
+    const products = await client.getProducts({ product_type: 'SPOT' });
+
+    // Get a single product
+    const product = await client.getProduct({ product_id: 'BTC-USD' });
+
+    // Candlestick data
+    const candles = await client.getProductCandles({
+      product_id: 'BTC-USD',
+      start: '1699920000',
+      end: '1700006400',
+      granularity: 'ONE_HOUR',
+    });
+
+    // Recent trades & best bid/ask snapshot
+    const trades = await client.getMarketTrades({
+      product_id: 'BTC-USD',
+      limit: 100,
+    });
+
+    // Best bid/ask across products
+    const bba = await client.getBestBidAsk({ product_ids: ['BTC-USD', 'ETH-USD'] });
+
+    // Full order book
+    const book = await client.getProductBook({
+      product_id: 'BTC-USD',
+      limit: 10,
+    });
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    // List tradeable currency pairs
+    const products = await client.getProducts({ product_type: 'SPOT' });
+
+    // Get a single product
+    const product = await client.getProduct({ product_id: 'BTC-USD' });
+
+    // Candlestick data
+    const candles = await client.getProductCandles({
+      product_id: 'BTC-USD',
+      start: '1699920000',
+      end: '1700006400',
+      granularity: 'ONE_HOUR',
+    });
+
+    // Recent trades & best bid/ask snapshot
+    const trades = await client.getMarketTrades({
+      product_id: 'BTC-USD',
+      limit: 100,
+    });
+
+    // Best bid/ask across products
+    const bba = await client.getBestBidAsk({ product_ids: ['BTC-USD', 'ETH-USD'] });
+
+    // Full order book
+    const book = await client.getProductBook({
+      product_id: 'BTC-USD',
+      limit: 10,
+    });
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Orders
+
+<Warning>
+  `submitOrder()` and `closePosition()` automatically validate and set a unique `client_order_id` if one is not supplied. All cancel operations accept an array of up to 100 order IDs per request.
+</Warning>
+
+<CodeGroup>
+  ```typescript Submit a limit order
+  const order = await client.submitOrder({
+    product_id: 'BTC-USD',
+    side: 'BUY',
+    order_configuration: {
+      limit_limit_gtc: {
+        base_size: '0.001',
+        limit_price: '30000',
+      },
+    },
+  });
+  ```
+
+  ```typescript Cancel orders
+  const result = await client.cancelOrders({
+    order_ids: ['order-id-1', 'order-id-2'],
+  });
+  ```
+
+  ```typescript Edit an order
+  const edited = await client.updateOrder({
+    order_id: 'order-id-1',
+    price: '31000',
+    size: '0.002',
+  });
+  ```
+
+  ```typescript List historical orders
+  const orders = await client.getOrders({
+    product_id: 'BTC-USD',
+    order_status: ['FILLED'],
+    limit: 50,
+  });
+  ```
+
+  ```typescript Get fills
+  const fills = await client.getFills({
+    product_id: 'BTC-USD',
+    limit: 100,
+  });
+  ```
+
+  ```typescript Preview before submitting
+  const preview = await client.previewOrder({
+    product_id: 'BTC-USD',
+    side: 'SELL',
+    order_configuration: {
+      market_market_ioc: { base_size: '0.01' },
+    },
+  });
+  ```
+
+  ```typescript Close a position
+  const closed = await client.closePosition({
+    client_order_id: 'my-close-001',
+    product_id: 'BTC-PERP-INTX',
+  });
+  ```
+</CodeGroup>
+
+---
+
+## Portfolios
+
+Manage multiple isolated portfolios, move funds between them, and inspect breakdowns.
+
+| Method | Description |
+|---|---|
+| `getPortfolios(params?)` | List all user portfolios |
+| `createPortfolio(params)` | Create a new portfolio |
+| `getPortfolioBreakdown(params)` | Get balances & positions for a portfolio |
+| `movePortfolioFunds(params)` | Move funds between portfolios |
+| `updatePortfolio(params)` | Rename a portfolio |
+| `deletePortfolio(params)` | Delete a portfolio |
+
+```typescript
+// Create a portfolio then inspect it
+const created = await client.createPortfolio({ name: 'Swing Trading' });
+
+const breakdown = await client.getPortfolioBreakdown({
+  portfolio_uuid: created.portfolio.uuid,
+  currency: 'USD',
+});
+
+// Move funds between portfolios
+await client.movePortfolioFunds({
+  funds: { value: '1000', currency: 'USD' },
+  source_portfolio_uuid: 'source-uuid',
+  target_portfolio_uuid: 'target-uuid',
+});
+```
+
+---
+
+## Futures
+
+Interact with Coinbase Financial Markets (CFM) futures accounts — balances, positions, and fund sweeps.
+
+| Method | Description |
+|---|---|
+| `getFuturesBalanceSummary()` | Get CFM balance summary |
+| `getFuturesPositions()` | List all open CFM positions |
+| `getFuturesPosition(params)` | Get a single CFM position |
+| `scheduleFuturesSweep(params?)` | Schedule a sweep from FCM wallet to USD spot |
+| `getFuturesSweeps()` | List pending/processing sweeps |
+| `cancelPendingFuturesSweep()` | Cancel a pending sweep |
+
+```typescript
+const balance = await client.getFuturesBalanceSummary();
+const positions = await client.getFuturesPositions();
+
+// Schedule a $500 sweep from futures to spot wallet
+await client.scheduleFuturesSweep({ usd_amount: '500' });
+```
+
+<Note>
+  Sweeps submitted before 5 PM ET are processed the next business day. Only one pending sweep is allowed at a time.
+</Note>
+
+---
+
+## Perpetuals
+
+Manage perpetual swap positions on the Intx (International) portfolio.
+
+| Method | Description |
+|---|---|
+| `allocatePortfolio(params)` | Allocate funds to a sub-portfolio |
+| `getPerpetualsPortfolioSummary(params)` | Get portfolio-level perpetuals summary |
+| `getPerpetualsPositions(params)` | List all open perpetuals positions |
+| `getPerpetualsPosition(params)` | Get a single perpetuals position |
+
+```typescript
+const summary = await client.getPerpetualsPortfolioSummary({
+  portfolio_uuid: 'your-intx-portfolio-uuid',
+});
+
+const positions = await client.getPerpetualsPositions({
+  portfolio_uuid: 'your-intx-portfolio-uuid',
+});
+```
+
+---
+
+## Convert
+
+Convert between stable pairs (USDC ↔ USD, EURC ↔ EUR) in a quote-then-commit flow.
+
+```typescript
+// Step 1: Get a quote
+const quote = await client.submitConvertQuote({
+  from_account: 'usdc-account-uuid',
+  to_account: 'usd-account-uuid',
+  amount: '100',
+});
+
+// Step 2: Inspect the trade
+const trade = await client.getConvertTrade({
+  trade_id: quote.trade.id,
+  from_account: 'usdc-account-uuid',
+  to_account: 'usd-account-uuid',
+});
+
+// Step 3: Commit it
+await client.commitConvertTrade({
+  trade_id: quote.trade.id,
+  from_account: 'usdc-account-uuid',
+  to_account: 'usd-account-uuid',
+});
+```
+
+---
+
+## Public Endpoints (No Auth Required)
+
+These endpoints can be called without API credentials, making them useful for market data dashboards and pre-login flows.
+
+| Method | Description |
+|---|---|
+| `getServerTime()` | Get current server time |
+| `getPublicProducts(params?)` | List all public products |
+| `getPublicProduct(params)` | Get a single public product |
+| `getPublicProductBook(params)` | Get the public order book |
+| `getPublicProductCandles(params)` | Get public OHLCV candles |
+| `getPublicMarketTrades(params)` | Get public recent trades |
+
+```typescript
+// No credentials needed
+const time = await client.getServerTime();
+const btcBook = await client.getPublicProductBook({ product_id: 'BTC-USD', limit: 5 });
+```
+
+---
+
+## Payment Methods
+
+```typescript
+// List all linked payment methods
+const methods = await client.getPaymentMethods();
+
+// Get details for a specific payment method
+const method = await client.getPaymentMethod({
+  payment_method_id: 'pm-uuid-here',
+});
+```
+
+---
+
+## API Key Permissions
+
+```typescript
+// Inspect what permissions the current CDP key has
+const perms = await client.getApiKeyPermissions();
+```
+
+---
+
+## Utility: fetchLatencySummary
+
+`fetchLatencySummary()` is a built-in SDK helper (not an official Coinbase API endpoint) that measures round-trip latency and estimates clock drift between your system and the Coinbase server.
+
+```typescript
+const latency = await client.fetchLatencySummary();
+// Returns: localTime, serverTime, roundTripTime, estimatedOneWayLatency, timeDifference
+```
+
+<Warning>
+  If `timeDifference` exceeds 500 ms, the SDK will log a warning. Large clock skew can cause request authentication failures. Sync your system clock with an NTP server to resolve this.
+</Warning>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Trade API Reference" icon="book" href="/api/advanced-trade/accounts">
+    Full endpoint reference for all Advanced Trade methods
+  </Card>
+  <Card title="Coinbase App Client" icon="mobile" href="/rest/coinbase-app">
+    Consumer wallet accounts, transactions, and prices
+  </Card>
+</CardGroup>

@@ -1,0 +1,399 @@
+---
+title: "CBAppClient API Reference — Accounts, Transactions & Wallets"
+sidebarTitle: "App API"
+description: "Complete method reference for CBAppClient — Coinbase App API for consumer wallet accounts, crypto addresses, transactions, deposits, withdrawals, and pricing."
+---
+
+`CBAppClient` is the REST client for the [Coinbase App API](https://docs.cdp.coinbase.com/coinbase-app/docs/welcome). It exposes consumer-facing wallet capabilities: listing accounts, managing crypto addresses, sending or receiving funds, handling fiat deposits and withdrawals, and querying live pricing data. Every request automatically attaches a `CB-VERSION` header required by the versioned API.
+
+## Installation & Setup
+
+```typescript
+import { CBAppClient } from 'coinbase-api';
+
+const client = new CBAppClient({
+  apiKey: 'YOUR_API_KEY_NAME',
+  apiSecret: 'YOUR_API_PRIVATE_KEY', // EC private key (PEM format)
+});
+```
+
+<Note>
+  The `apiKey` is your CDP API key name. The `apiSecret` is the full EC private key string including `-----BEGIN EC PRIVATE KEY-----`. These are used to generate a short-lived JWT for each request.
+</Note>
+
+---
+
+## All Methods
+
+The table below lists every method, whether it requires authentication, its HTTP verb, and the endpoint it targets.
+
+| Method | Auth | HTTP | Endpoint |
+|--------|:----:|:----:|----------|
+| `getAccounts()` | 🔒 | GET | `/v2/accounts` |
+| `getAccount()` | 🔒 | GET | `/v2/accounts/{account_id}` |
+| `createAddress()` | 🔒 | POST | `/v2/accounts/{account_id}/addresses` |
+| `getAddresses()` | 🔒 | GET | `/v2/accounts/{account_id}/addresses` |
+| `getAddress()` | 🔒 | GET | `/v2/accounts/{account_id}/addresses/{addressId}` |
+| `getAddressTransactions()` | 🔒 | GET | `/v2/accounts/{account_id}/addresses/{addressId}/transactions` |
+| `sendMoney()` | 🔒 | POST | `/v2/accounts/{account_id}/transactions` |
+| `transferMoney()` | 🔒 | POST | `/v2/accounts/{account_id}/transactions` |
+| `getTransactions()` | 🔒 | GET | `/v2/accounts/{account_id}/transactions` |
+| `getTransaction()` | 🔒 | GET | `/v2/accounts/{account_id}/transactions/{transactionId}` |
+| `depositFunds()` | 🔒 | POST | `/v2/accounts/{account_id}/deposits` |
+| `commitDeposit()` | 🔒 | POST | `/v2/accounts/{account_id}/deposits/{deposit_id}/commit` |
+| `getDeposits()` | 🔒 | GET | `/v2/accounts/{account_id}/deposits` |
+| `getDeposit()` | 🔒 | GET | `/v2/accounts/{account_id}/deposits/{deposit_id}` |
+| `withdrawFunds()` | 🔒 | POST | `/v2/accounts/{account_id}/withdrawals` |
+| `commitWithdrawal()` | 🔒 | POST | `/v2/accounts/{account_id}/withdrawals/{withdrawal_id}/commit` |
+| `getWithdrawals()` | 🔒 | GET | `/v2/accounts/{account_id}/withdrawals` |
+| `getWithdrawal()` | 🔒 | GET | `/v2/accounts/{account_id}/withdrawals/{withdrawal_id}` |
+| `getFiatCurrencies()` | — | GET | `/v2/currencies` |
+| `getCryptocurrencies()` | — | GET | `/v2/currencies/crypto` |
+| `getExchangeRates()` | — | GET | `/v2/exchange-rates` |
+| `getBuyPrice()` | — | GET | `/v2/prices/{currencyPair}/buy` |
+| `getSellPrice()` | — | GET | `/v2/prices/{currencyPair}/sell` |
+| `getSpotPrice()` | — | GET | `/v2/prices/{currencyPair}/spot` |
+| `getCurrentTime()` | — | GET | `/v2/time` |
+
+---
+
+## Pagination
+
+Several list methods (`getAccounts`, `getAddresses`, `getAddressTransactions`, `getTransactions`, `getDeposits`, `getWithdrawals`) return a `pagination` object alongside `data`. To fetch the next page, pass the `next_uri` value from the previous response as `paginationURL`:
+
+```typescript
+// First page
+const page1 = await client.getAccounts();
+
+// Subsequent pages
+if (page1.pagination.next_uri) {
+  const page2 = await client.getAccounts({
+    paginationURL: page1.pagination.next_uri,
+  });
+}
+```
+
+---
+
+## Accounts
+
+### `getAccounts(params?)`
+
+Returns all accounts associated with the authenticated user's API key. Supports pagination.
+
+<ParamField body="paginationURL" type="string">
+  Next-page URI returned by a previous `getAccounts()` call. Leave empty on the first request.
+</ParamField>
+<ParamField body="starting_after" type="string">
+  Cursor ID; returns accounts after this ID.
+</ParamField>
+
+```typescript
+const { data, pagination } = await client.getAccounts();
+
+for (const account of data) {
+  console.log(account.name, account.balance.amount, account.balance.currency);
+}
+```
+
+### `getAccount(params)`
+
+Retrieves a single account by ID or currency string (e.g., `"BTC"`).
+
+<ParamField body="account_id" type="string" required>
+  Account UUID or currency string.
+</ParamField>
+
+```typescript
+const { data } = await client.getAccount({ account_id: 'BTC' });
+console.log(data.balance.amount); // e.g. "0.50000000"
+```
+
+---
+
+## Addresses
+
+### `createAddress(params)`
+
+Creates a new crypto receive address for a wallet account.
+
+<ParamField body="account_id" type="string" required>
+  The account for which to generate an address.
+</ParamField>
+<ParamField body="name" type="string">
+  Optional label for the new address.
+</ParamField>
+
+```typescript
+const { data } = await client.createAddress({
+  account_id: 'BTC',
+  name: 'Customer deposit address',
+});
+console.log(data.address); // "bc1q..."
+```
+
+### `getAddresses(params)` / `getAddress(params)` / `getAddressTransactions(params)`
+
+```typescript
+// List all addresses for an account
+const { data } = await client.getAddresses({ account_id: 'BTC' });
+
+// Get a specific address
+const { data: addr } = await client.getAddress({
+  account_id: 'BTC',
+  addressId: 'bc1q...',
+});
+
+// Transactions received at an address
+const { data: txns } = await client.getAddressTransactions({
+  account_id: 'BTC',
+  addressId: 'bc1q...',
+});
+```
+
+---
+
+## Transactions
+
+### `sendMoney(params)`
+
+Sends crypto to an external network address or a Coinbase user's email.
+
+<ParamField body="account_id" type="string" required>
+  Source account ID or currency string.
+</ParamField>
+<ParamField body="type" type="string" required>
+  Must be `"send"`.
+</ParamField>
+<ParamField body="to" type="string" required>
+  Destination crypto address or email.
+</ParamField>
+<ParamField body="amount" type="string" required>
+  Amount to send as a decimal string, e.g. `"0.001"`.
+</ParamField>
+<ParamField body="currency" type="string" required>
+  Currency code, e.g. `"BTC"`.
+</ParamField>
+<ParamField body="description" type="string">
+  Optional memo for the transaction.
+</ParamField>
+<ParamField body="skip_notifications" type="boolean">
+  If `true`, suppresses the email notification to the recipient.
+</ParamField>
+<ParamField body="idem" type="string">
+  Idempotency key — prevents duplicate sends on retry.
+</ParamField>
+<ParamField body="to_financial_institution" type="boolean">
+  Set `true` for Travel Rule compliance when sending to a financial institution.
+</ParamField>
+<ParamField body="financial_institution_website" type="string">
+  Required when `to_financial_institution` is `true`.
+</ParamField>
+
+```typescript
+const { data } = await client.sendMoney({
+  account_id: 'BTC',
+  type: 'send',
+  to: 'bc1qexampleaddress...',
+  amount: '0.001',
+  currency: 'BTC',
+  description: 'Payment for invoice #42',
+  idem: 'unique-idempotency-key-123',
+});
+console.log(data.id, data.status);
+```
+
+### `transferMoney(params)`
+
+Moves funds between two accounts belonging to the same user. Both accounts must share the same currency.
+
+<ParamField body="account_id" type="string" required>
+  Source account ID or currency string.
+</ParamField>
+<ParamField body="type" type="string" required>
+  Must be `"transfer"`.
+</ParamField>
+<ParamField body="to" type="string" required>
+  Destination account ID.
+</ParamField>
+<ParamField body="amount" type="string" required>
+  Amount to transfer.
+</ParamField>
+<ParamField body="currency" type="string" required>
+  Currency code.
+</ParamField>
+
+```typescript
+const { data } = await client.transferMoney({
+  account_id: 'ETH',
+  type: 'transfer',
+  to: 'destination-account-uuid',
+  amount: '1.0',
+  currency: 'ETH',
+});
+```
+
+### `getTransactions(params)` / `getTransaction(params)`
+
+```typescript
+// List all transactions for an account
+const { data, pagination } = await client.getTransactions({
+  account_id: 'BTC',
+});
+
+// Get a single transaction
+const { data: tx } = await client.getTransaction({
+  account_id: 'BTC',
+  transactionId: 'tx-uuid',
+});
+console.log(tx.type, tx.status, tx.amount.amount);
+```
+
+---
+
+## Deposits
+
+### `depositFunds(params)`
+
+Initiates a fiat deposit from a linked payment method into a fiat account.
+
+<ParamField body="account_id" type="string" required>
+  Fiat account to receive funds (e.g., a USD account).
+</ParamField>
+<ParamField body="amount" type="string" required>
+  Deposit amount as a decimal string.
+</ParamField>
+<ParamField body="currency" type="string" required>
+  Fiat currency code, e.g. `"USD"`.
+</ParamField>
+<ParamField body="payment_method" type="string" required>
+  Payment method ID to debit.
+</ParamField>
+<ParamField body="commit" type="boolean">
+  If `false`, creates the deposit in a pending state that must be committed separately.
+</ParamField>
+
+```typescript
+const deposit = await client.depositFunds({
+  account_id: 'USD',
+  amount: '100.00',
+  currency: 'USD',
+  payment_method: 'payment-method-uuid',
+  commit: true,
+});
+```
+
+### `commitDeposit(params)`
+
+Finalises a deposit that was created with `commit: false`.
+
+```typescript
+await client.commitDeposit({
+  account_id: 'USD',
+  deposit_id: 'deposit-uuid',
+});
+```
+
+### `getDeposits(params)` / `getDeposit(params)`
+
+```typescript
+const { data } = await client.getDeposits({ account_id: 'USD' });
+const { data: dep } = await client.getDeposit({
+  account_id: 'USD',
+  deposit_id: 'deposit-uuid',
+});
+```
+
+---
+
+## Withdrawals
+
+### `withdrawFunds(params)`
+
+Withdraws fiat from a Coinbase account to a linked payment method.
+
+<ParamField body="account_id" type="string" required>
+  Fiat account to withdraw from.
+</ParamField>
+<ParamField body="amount" type="string" required>
+  Amount to withdraw.
+</ParamField>
+<ParamField body="currency" type="string" required>
+  Currency code.
+</ParamField>
+<ParamField body="payment_method" type="string" required>
+  Payment method ID to credit.
+</ParamField>
+<ParamField body="commit" type="boolean">
+  If `false`, creates the withdrawal in a pending state.
+</ParamField>
+
+```typescript
+await client.withdrawFunds({
+  account_id: 'USD',
+  amount: '50.00',
+  currency: 'USD',
+  payment_method: 'payment-method-uuid',
+});
+```
+
+### `commitWithdrawal(params)` / `getWithdrawals(params)` / `getWithdrawal(params)`
+
+```typescript
+await client.commitWithdrawal({ account_id: 'USD', withdrawal_id: 'wd-uuid' });
+
+const { data } = await client.getWithdrawals({ account_id: 'USD' });
+const { data: wd } = await client.getWithdrawal({
+  account_id: 'USD',
+  withdrawal_id: 'wd-uuid',
+});
+```
+
+---
+
+## Data & Pricing (No Auth Required)
+
+### `getFiatCurrencies()` / `getCryptocurrencies()`
+
+```typescript
+const { data: fiats } = await client.getFiatCurrencies();
+// [{ id: 'USD', name: 'US Dollar', min_size: '0.01' }, ...]
+
+const cryptos = await client.getCryptocurrencies();
+// [{ code: 'BTC', name: 'Bitcoin', ... }, ...]
+```
+
+### `getExchangeRates(params?)`
+
+Returns exchange rates for one unit of the base currency against all supported currencies.
+
+<ParamField query="currency" type="string">
+  Base currency code. Defaults to `"USD"`.
+</ParamField>
+
+```typescript
+const { data } = await client.getExchangeRates({ currency: 'BTC' });
+console.log(data.rates['USD']); // e.g. "67450.12"
+```
+
+### `getBuyPrice(params)` / `getSellPrice(params)` / `getSpotPrice(params)`
+
+```typescript
+const { data: buy } = await client.getBuyPrice({ currencyPair: 'BTC-USD' });
+const { data: sell } = await client.getSellPrice({ currencyPair: 'BTC-USD' });
+const { data: spot } = await client.getSpotPrice({
+  currencyPair: 'BTC-USD',
+  date: '2024-01-01', // optional historical date (YYYY-MM-DD)
+});
+console.log(buy.amount, sell.amount, spot.amount);
+```
+
+### `getCurrentTime()`
+
+Returns the API server time. No authentication required.
+
+```typescript
+const { data } = await client.getCurrentTime();
+console.log(data.iso);   // "2025-01-15T10:30:00Z"
+console.log(data.epoch); // 1736940600
+```

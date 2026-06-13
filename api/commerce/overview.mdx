@@ -1,0 +1,255 @@
+---
+title: "CBCommerceClient API Reference — Charges, Checkouts & Events"
+sidebarTitle: "Commerce API"
+description: "Full method reference for CBCommerceClient — Coinbase Commerce API for crypto payment charges, hosted checkout pages, and webhook event retrieval."
+---
+
+`CBCommerceClient` is the REST client for the [Coinbase Commerce API](https://docs.cdp.coinbase.com/commerce-onchain/docs/welcome). It enables merchants to accept cryptocurrency payments by creating on-demand payment charges, setting up reusable hosted checkout pages, and querying webhook delivery events. All endpoints require an API key.
+
+## Installation & Setup
+
+```typescript
+import { CBCommerceClient } from 'coinbase-api';
+
+const client = new CBCommerceClient({
+  apiKey: 'YOUR_COMMERCE_API_KEY',
+});
+```
+
+<Note>
+  Commerce API keys are generated in the Coinbase Commerce merchant dashboard — they are separate from CDP API keys used by other Coinbase clients. The base URL is `https://api.commerce.coinbase.com`.
+</Note>
+
+---
+
+## All Methods
+
+| Method | Auth | HTTP | Endpoint |
+|--------|:----:|:----:|----------|
+| `createCharge()` | 🔒 | POST | `/charges` |
+| `getAllCharges()` | 🔒 | GET | `/charges` |
+| `getCharge()` | 🔒 | GET | `/charges/{charge_code_or_charge_id}` |
+| `createCheckout()` | 🔒 | POST | `/checkouts` |
+| `getAllCheckouts()` | 🔒 | GET | `/checkouts` |
+| `getCheckout()` | 🔒 | GET | `/checkouts/{checkout_id}` |
+| `listEvents()` | 🔒 | GET | `/events` |
+| `showEvent()` | 🔒 | GET | `/events/{event_id}` |
+
+---
+
+## Charges
+
+A **charge** represents a single payment request for a specific amount. When a customer pays a charge, Coinbase Commerce monitors the blockchain and updates its status.
+
+### `createCharge(params)`
+
+Creates a new charge. The customer is directed to a hosted payment page where they can pay with any supported cryptocurrency.
+
+<ParamField body="local_price" type="object" required>
+  The price of the charge in fiat. Contains `amount` (string) and `currency` (ISO 4217 code).
+</ParamField>
+<ParamField body="pricing_type" type="string" required>
+  `"fixed_price"` to charge a specific fiat amount, or `"no_price"` for open-ended donations.
+</ParamField>
+<ParamField body="buyer_locale" type="string">
+  BCP 47 locale for the hosted payment page (e.g. `"en-US"`).
+</ParamField>
+<ParamField body="cancel_url" type="string">
+  URL to redirect the customer to if they cancel the payment.
+</ParamField>
+<ParamField body="redirect_url" type="string">
+  URL to redirect the customer to after a successful payment.
+</ParamField>
+<ParamField body="checkout_id" type="string">
+  Associate this charge with an existing checkout.
+</ParamField>
+<ParamField body="metadata" type="object">
+  Custom key-value pairs (max 2 fields: `custom_field` and `custom_field_two`) for your own reference.
+</ParamField>
+
+```typescript
+const charge = await client.createCharge({
+  local_price: {
+    amount: '49.99',
+    currency: 'USD',
+  },
+  pricing_type: 'fixed_price',
+  redirect_url: 'https://mystore.com/thank-you',
+  cancel_url: 'https://mystore.com/cart',
+  metadata: {
+    custom_field: 'order_id_12345',
+  },
+});
+
+console.log(charge.data.id);         // Charge UUID
+console.log(charge.data.code);       // Short code (e.g. "ABCD1234")
+console.log(charge.data.hosted_url); // URL to send the customer to
+```
+
+### `getAllCharges()`
+
+Returns all charges associated with the authenticated merchant account. Results are paginated.
+
+```typescript
+const response = await client.getAllCharges();
+const charges = response.data;
+
+for (const charge of charges) {
+  console.log(charge.code, charge.timeline.at(-1)?.status);
+}
+```
+
+### `getCharge(params)`
+
+Retrieves a specific charge by its short code (e.g. `"ABCD1234"`) or full UUID.
+
+<ParamField query="charge_code_or_charge_id" type="string" required>
+  The charge's short code or UUID.
+</ParamField>
+
+```typescript
+const { data: charge } = await client.getCharge({
+  charge_code_or_charge_id: 'ABCD1234',
+});
+
+console.log(charge.id, charge.name);
+
+// Check the latest status
+const latestStatus = charge.timeline.at(-1)?.status;
+// Possible values: NEW, PENDING, COMPLETED, EXPIRED, UNRESOLVED, RESOLVED, CANCELED, REFUND PENDING, REFUNDED
+console.log(latestStatus);
+```
+
+---
+
+## Checkouts
+
+A **checkout** is a reusable payment page template. Create one checkout and generate multiple charges from it, or share the checkout URL for repeated payments (e.g. a recurring tip jar).
+
+### `createCheckout(params)`
+
+Creates a reusable hosted checkout page.
+
+<ParamField body="total_price" type="object" required>
+  The price to charge. Contains `amount` (string) and `currency` (ISO 4217 code).
+</ParamField>
+<ParamField body="pricing_type" type="string" required>
+  `"fixed_price"` or `"no_price"`.
+</ParamField>
+<ParamField body="buyer_locale" type="string">
+  BCP 47 locale for the checkout page.
+</ParamField>
+<ParamField body="requested_info" type="string[]">
+  Additional information to collect from the buyer. Supported values: `"email"`, `"name"`.
+</ParamField>
+<ParamField body="metadata" type="object">
+  Custom key-value metadata (`custom_field`, `custom_field_two`).
+</ParamField>
+
+```typescript
+const checkout = await client.createCheckout({
+  total_price: {
+    amount: '9.99',
+    currency: 'USD',
+  },
+  pricing_type: 'fixed_price',
+  requested_info: ['email', 'name'],
+  metadata: {
+    custom_field: 'premium_subscription',
+  },
+});
+
+console.log(checkout.data.id);         // Checkout UUID
+console.log(checkout.data.hosted_url); // Shareable checkout URL
+```
+
+### `getAllCheckouts()`
+
+Returns all checkouts for the authenticated merchant.
+
+```typescript
+const response = await client.getAllCheckouts();
+for (const checkout of response.data) {
+  console.log(checkout.id, checkout.name);
+}
+```
+
+### `getCheckout(params)`
+
+Retrieves a specific checkout session by its UUID.
+
+<ParamField query="checkout_id" type="string" required>
+  Checkout UUID.
+</ParamField>
+
+```typescript
+const { data: checkout } = await client.getCheckout({
+  checkout_id: 'checkout-uuid',
+});
+console.log(checkout.total_price.amount, checkout.total_price.currency);
+```
+
+---
+
+## Events
+
+Events are created by Coinbase Commerce whenever the status of a charge or checkout changes. They are delivered via webhooks and can also be queried via the API.
+
+### `listEvents(headers)`
+
+Returns a paginated list of all events for the merchant. Requires the `X-CC-Version` header to specify the API version.
+
+<ParamField header="X-CC-Version" type="string" required>
+  The API version date, e.g. `"2018-03-22"`.
+</ParamField>
+
+```typescript
+const events = await client.listEvents({
+  'X-CC-Version': '2018-03-22',
+});
+
+for (const event of events.data) {
+  console.log(event.id, event.type, event.created_at);
+  // event.type examples: "charge:created", "charge:confirmed", "charge:failed", "charge:delayed", "charge:pending", "charge:resolved"
+}
+```
+
+### `showEvent(params, headers)`
+
+Retrieves the full details of a specific event by its UUID. Useful for re-processing a webhook payload.
+
+<ParamField query="event_id" type="string" required>
+  Event UUID (typically received in a webhook body).
+</ParamField>
+<ParamField header="X-CC-Version" type="string" required>
+  The API version date.
+</ParamField>
+
+```typescript
+const event = await client.showEvent(
+  { event_id: 'event-uuid' },
+  { 'X-CC-Version': '2018-03-22' },
+);
+
+console.log(event.data.type);       // e.g. "charge:confirmed"
+console.log(event.data.data.code);  // The associated charge's short code
+```
+
+---
+
+## Webhook Event Types
+
+Coinbase Commerce sends webhook notifications for the following event types:
+
+| Event Type | Description |
+|------------|-------------|
+| `charge:created` | A new charge has been created. |
+| `charge:confirmed` | Sufficient payment received and confirmed on-chain. |
+| `charge:failed` | Payment expired or was otherwise unsuccessful. |
+| `charge:delayed` | Payment received after the charge expired. |
+| `charge:pending` | An on-chain transaction has been detected but is not yet confirmed. |
+| `charge:resolved` | A previously unresolved charge has been manually resolved. |
+
+<Note>
+  Always verify webhook signatures using the webhook secret from your Commerce dashboard. The `X-CC-Webhook-Signature` header on inbound webhooks contains the HMAC-SHA256 signature.
+</Note>

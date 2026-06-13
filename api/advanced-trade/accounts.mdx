@@ -1,0 +1,198 @@
+---
+title: "Advanced Trade Accounts API — getAccount & getAccounts"
+sidebarTitle: "Accounts"
+description: "Retrieve Coinbase Advanced Trade brokerage accounts. getAccounts lists all accounts; getAccount fetches a single account by UUID with balance details."
+---
+
+The Advanced Trade Accounts endpoints let you enumerate all brokerage accounts associated with your API key, retrieve balance and hold information for a specific account by UUID, and inspect the permissions granted to your CDP API key. Payment method endpoints are also grouped here because they are closely related to account funding. The `getServerTime()` public endpoint and the `fetchLatencySummary()` SDK utility round out this group.
+
+---
+
+## getAccounts
+
+List all authenticated brokerage accounts for the current user. Results are paginated — use `cursor` from the previous response to fetch the next page.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/accounts` |
+
+<ParamField query="limit" type="number">
+  Maximum number of accounts to return per page. Defaults to all available accounts when omitted.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor returned by a previous call. Pass this value to retrieve the next page of results.
+</ParamField>
+
+**Returns:** `Promise<AdvTradeAccountsList>` — an object containing an `accounts` array, a `has_next` boolean, a `cursor` string for the next page, and a `size` count.
+
+```typescript
+import { CBAdvancedTradeClient } from 'coinbase-api';
+
+const client = new CBAdvancedTradeClient({
+  apiKey: 'your-api-key-name',
+  apiSecret: '-----BEGIN EC PRIVATE KEY-----\n...\n-----END EC PRIVATE KEY-----\n',
+});
+
+// Fetch the first page of accounts
+const { accounts, has_next, cursor } = await client.getAccounts({ limit: 50 });
+console.log(`Fetched ${accounts.length} accounts, has_next: ${has_next}`);
+
+// Fetch the next page when has_next is true
+if (has_next) {
+  const nextPage = await client.getAccounts({ limit: 50, cursor });
+  console.log(nextPage.accounts);
+}
+```
+
+---
+
+## getAccount
+
+Retrieve detailed information about a single brokerage account by its UUID, including its current available balance and hold amounts.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/accounts/{account_id}` |
+
+<ParamField path="account_id" type="string" required>
+  The UUID of the account to retrieve. Use `getAccounts()` to discover account UUIDs.
+</ParamField>
+
+**Returns:** `Promise<{ account: AdvTradeAccount }>` — an object wrapping the full `AdvTradeAccount` record including `uuid`, `name`, `currency`, `available_balance`, `hold`, `active`, and `platform` fields.
+
+```typescript
+const { account } = await client.getAccount({
+  account_id: '8bfc20d7-f7c6-4422-bf07-8243ca4169fe',
+});
+
+console.log(account.currency);           // e.g. "BTC"
+console.log(account.available_balance);  // { value: "0.05", currency: "BTC" }
+console.log(account.hold);               // { value: "0.00", currency: "BTC" }
+```
+
+---
+
+## getApiKeyPermissions
+
+Retrieve the permissions associated with the CDP API key currently in use. Use this to verify which operations — view, trade, or transfer — are enabled before executing sensitive requests.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/key_permissions` |
+
+No parameters.
+
+**Returns:** `Promise<AdvTradeApiKeyPermissions>` — an object with `can_view`, `can_trade`, `can_transfer` booleans, plus `portfolio_uuid` and `portfolio_type`.
+
+```typescript
+const permissions = await client.getApiKeyPermissions();
+
+if (!permissions.can_trade) {
+  throw new Error('API key does not have trading permissions');
+}
+console.log('Portfolio UUID:', permissions.portfolio_uuid);
+```
+
+---
+
+## getPaymentMethods
+
+List all payment methods (bank accounts, cards, etc.) linked to the current user's Coinbase account.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/payment_methods` |
+
+No parameters.
+
+**Returns:** `Promise<{ payment_methods: AdvTradePaymentMethod[] }>` — an array of payment method objects, each containing `id`, `type`, `name`, `currency`, `verified`, and capability flags (`allow_buy`, `allow_sell`, `allow_deposit`, `allow_withdraw`).
+
+```typescript
+const { payment_methods } = await client.getPaymentMethods();
+
+const buyCapable = payment_methods.filter(m => m.allow_buy);
+console.log(`${buyCapable.length} payment methods support buying`);
+```
+
+---
+
+## getPaymentMethod
+
+Retrieve detailed information about a specific payment method by its ID.
+
+| | |
+|---|---|
+| **Auth** | Required |
+| **HTTP** | `GET /api/v3/brokerage/payment_methods/{payment_method_id}` |
+
+<ParamField path="payment_method_id" type="string" required>
+  The unique ID of the payment method to retrieve. Obtain IDs from `getPaymentMethods()`.
+</ParamField>
+
+**Returns:** `Promise<{ payment_method: AdvTradePaymentMethod }>` — an object wrapping the full payment method record.
+
+```typescript
+const { payment_method } = await client.getPaymentMethod({
+  payment_method_id: 'b89e3b51-d88c-4ab2-8e53-a48da6db7cc5',
+});
+
+console.log(payment_method.type);     // e.g. "ACH_BANK_ACCOUNT"
+console.log(payment_method.verified); // true
+```
+
+---
+
+## getServerTime
+
+Return the current server time from Coinbase. This is a **public endpoint** — no API key is required. Use it to verify clock synchronisation before placing time-sensitive signed requests.
+
+| | |
+|---|---|
+| **Auth** | None (public) |
+| **HTTP** | `GET /api/v3/brokerage/time` |
+
+No parameters.
+
+**Returns:** `Promise<{ iso: string; epochSeconds: string; epochMillis: string }>` — the server timestamp in ISO 8601 format and as Unix epoch values in both seconds and milliseconds.
+
+```typescript
+// No credentials required
+const publicClient = new CBAdvancedTradeClient();
+
+const serverTime = await publicClient.getServerTime();
+console.log(serverTime.iso);          // "2024-01-15T12:34:56Z"
+console.log(serverTime.epochMillis);  // "1705319696000"
+```
+
+---
+
+## fetchLatencySummary
+
+A **custom SDK utility** (not an official Coinbase API endpoint) that measures the round-trip latency between the SDK client and Coinbase servers, estimates one-way latency, and warns you if local clock drift exceeds 500 ms.
+
+| | |
+|---|---|
+| **Auth** | Uses `getServerTime()` internally (public) |
+| **HTTP** | Calls `GET /api/v3/brokerage/time` internally |
+
+No parameters.
+
+**Returns:** `Promise<{ localTime: number; serverTime: number; roundTripTime: number; estimatedOneWayLatency: number; adjustedServerTime: number; timeDifference: number }>` — a summary of timing measurements. Also logs results to the console.
+
+<Warning>
+  This method prints to `console.log` / `console.warn` as a side effect. It is intended for diagnostics only — do not call it on every request.
+</Warning>
+
+```typescript
+const latency = await client.fetchLatencySummary();
+
+console.log(`Round-trip time: ${latency.roundTripTime}ms`);
+console.log(`Estimated one-way latency: ${latency.estimatedOneWayLatency}ms`);
+console.log(`Clock drift: ${latency.timeDifference}ms`);
+// A warning is printed automatically if |timeDifference| > 500ms
+```
